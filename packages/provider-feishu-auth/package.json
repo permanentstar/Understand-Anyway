@@ -1,0 +1,33 @@
+{
+  "name": "@understand-anyway/provider-feishu-auth",
+  "version": "0.0.1",
+  "description": "Optional Feishu (Lark) OAuth2 login provider implementing the AuthProvider contract over public Feishu endpoints.",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@understand-anyway/plugin-api": "workspace:*",
+    "simple-oauth2": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/simple-oauth2": "^5.0.7"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}

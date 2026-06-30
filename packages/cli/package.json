@@ -1,0 +1,49 @@
+{
+  "name": "@understand-anyway/cli",
+  "version": "0.0.1",
+  "description": "CLI entry for Understand-Anyway: build, dashboard, prod, incremental, scheduling.",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "understand-anyway": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "deploy.example.yaml",
+    "src/config/deploy.schema.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@understand-anyway/core": "workspace:*",
+    "@understand-anyway/gateway": "workspace:*",
+    "@understand-anyway/plugin-api": "workspace:*",
+    "ajv": "^8.17.1",
+    "yaml": "^2.4.2"
+  },
+  "peerDependencies": {
+    "@understand-anyway/provider-feishu-sheets": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@understand-anyway/provider-feishu-sheets": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@understand-anyway/provider-feishu-sheets": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/cli.ts --format esm --dts --clean",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  }
+}

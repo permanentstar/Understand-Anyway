@@ -1,0 +1,130 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://understand-anyway.dev/schemas/deploy.schema.json",
+  "title": "Understand-Anyway deploy config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "description": "Config schema version."
+    },
+    "deploy": { "$ref": "#/definitions/deploy" },
+    "gateway": { "$ref": "#/definitions/gateway" },
+    "providers": { "$ref": "#/definitions/providers" },
+    "record": { "$ref": "#/definitions/record" },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/profile" }
+    }
+  },
+  "definitions": {
+    "deploy": {
+      "type": "object",
+      "description": "Global deploy defaults (layer 4). Unknown fields pass through (portal display etc.).",
+      "additionalProperties": true,
+      "properties": {
+        "host": { "type": "string" },
+        "port": { "type": "integer" },
+        "outputLanguage": { "type": "string" },
+        "build": { "$ref": "#/definitions/build" }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "description": "Shared gateway runtime defaults. `retain` is the number of non-protected releases to keep on every `gateway publish`.",
+      "additionalProperties": false,
+      "properties": {
+        "retain": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "providers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "auth": { "$ref": "#/definitions/providerEntry" },
+        "orgPolicy": { "$ref": "#/definitions/providerEntry" },
+        "portalAssets": { "$ref": "#/definitions/providerEntry" },
+        "llm": { "$ref": "#/definitions/providerEntry" },
+        "embedding": { "$ref": "#/definitions/providerEntry" },
+        "notify": { "$ref": "#/definitions/providerEntry" }
+      }
+    },
+    "providerEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package"],
+      "properties": {
+        "package": { "type": "string" },
+        "config": {}
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "providers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "config": { "type": "object" }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "description": "A named profile (layer 3). Unknown fields pass through.",
+      "additionalProperties": true,
+      "properties": {
+        "host": { "type": "string" },
+        "port": { "type": "integer" },
+        "portal": { "type": "boolean" },
+        "projectRoute": { "type": "boolean" },
+        "registry": { "type": "string" },
+        "use": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "build": { "$ref": "#/definitions/build" }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "outputLanguage": { "type": "string" },
+        "excludeTests": { "type": "boolean" },
+        "pluginRoot": { "type": "string" },
+        "mode": {
+          "type": "string",
+          "enum": ["full", "incremental", "resume", "backfill"]
+        },
+        "llmAnalysis": { "type": "boolean" },
+        "llmRequired": { "type": "boolean" },
+        "llmModelCandidates": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "llmRetry": { "$ref": "#/definitions/llmRetry" },
+        "batchMode": {
+          "type": "string",
+          "enum": ["auto", "full", "segmented"]
+        },
+        "mapperBatchCount": { "type": "integer", "minimum": 1 },
+        "mapperConcurrency": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "llmRetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Tunes the transient retry around a single LLM call (C8). All fields optional; omitted values fall back to DEFAULT_RETRY_POLICY.",
+      "properties": {
+        "maxAttempts": { "type": "integer", "minimum": 1 },
+        "initialBackoffMs": { "type": "integer", "minimum": 0 },
+        "backoffMultiplier": { "type": "number", "minimum": 1 },
+        "maxBackoffMs": { "type": "integer", "minimum": 0 },
+        "jitterRatio": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

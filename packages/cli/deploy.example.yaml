@@ -1,0 +1,126 @@
+# yaml-language-server: $schema=./src/config/deploy.schema.json
+# Example deploy config for `understand-anyway serve`.
+#
+# This is a NEUTRAL template: package names are placeholders. Real provider
+# packages (e.g. an in-house SSO/org-directory overlay) are supplied by your own
+# deployment — the open-source CLI never ships or hard-codes any provider name.
+#
+# `deploy.schema.json` (next to this file's source) is the machine-readable
+# contract: editors use it for completion via the `$schema` line above, and the
+# CLI validates the discovered config against the same schema at startup.
+#
+# Discovery: the CLI finds this file via `--config <path|dir>`, then `$UA_CONFIG`,
+# then `./deploy.yaml` / `./config/deploy.yaml`, then `<exe-root>/deploy.yaml`.
+# No user home absolute directory is ever part of the default search chain.
+#
+# Secrets NEVER live in this file. Use `{{ }}` placeholders only:
+#   {{ ENV_KEY }}        resolved from shell env, then the fixed .env chain
+#   {{ file('/path') }}  contents of a dedicated secret file (trimmed)
+# The .env chain is ./.env then ~/.env and holds secret VALUES only.
+
+version: 1
+
+# Layer 4 (base): global deploy defaults. Overridden per-field by a profile,
+# then supported env overrides (UA_SERVE_HOST / UA_SERVE_PORT), then explicit
+# CLI flags. Topology flags such as the deployment profile (prod|ppe|dev)
+# live in ~/.env as UA_DEPLOY_PROFILE; the CLI accepts an override only.
+deploy:
+  host: "0.0.0.0"
+  port: 18666
+  outputLanguage: "en"
+
+# Gateway runtime retention. Applied on every `gateway publish`. Protects
+# current + stable releases on top of `retain` non-protected ones.
+gateway:
+  retain: 3
+
+# Dynamically loaded providers. `package` is the only source of provider package
+# names; `config` is passed verbatim to the package's factory export.
+providers:
+  auth:
+    package: "<your-auth-provider-package>"
+    config:
+      appId: "<your-app-id>"
+      appSecret: "{{ APP_SECRET }}"        # placeholder; real value via env/.env
+      redirectOrigin: "https://example.invalid"
+  orgPolicy:
+    package: "<your-org-policy-package>"
+    config:
+      allowDepartmentPath: "Root-Team"
+      allowDepartmentSubtree: true
+  portalAssets:
+    package: "<your-portal-assets-package>"
+    config:
+      routePrefix: "/portal-assets/"
+  # Optional LLM enrichment provider. Loaded dynamically by package name; the
+  # open-source build stays deterministic unless a profile enables it via
+  # `build.llmAnalysis: true`. There is no CLI surface for LLM flags anymore —
+  # configure everything here, then select the profile with `--profile <name>`.
+  llm:
+    package: "<your-llm-provider-package>"
+    config:
+      model: "<your-model>"
+      modelCandidates: ["small", "large"]
+
+# Record sinks. Set `providers: []` to disable external records entirely.
+# Per-provider config goes under `config` keyed by provider name.
+record:
+  providers: ["local"]
+  config:
+    feishu-sheets:
+      spreadsheetToken: "{{ RECORD_SHEET_TOKEN }}"   # placeholder
+      worksheets:
+        nightly: "nightly-update"
+        project: "project-update"
+      mappings: {}
+
+# Layer 3: named profiles, selected with `--profile <name>` (for build/nightly
+# scripts) or `--serve-profile <name>` (for `dashboard start` and friends).
+profiles:
+  sso-portal:
+    portal: true
+    projectRoute: true
+    use: [auth, orgPolicy, portalAssets]   # which providers.* blocks to activate
+    registry: "/path/to/understand-projects/gateway/registry.json"
+
+  # Build-oriented profiles. `build.llmAnalysis` enables optional LLM
+  # enrichment; `build.llmRequired` turns provider/parse failures into hard
+  # build failures. Both default false. `build.llmRetry` tunes the
+  # transient-retry loop around a single LLM call (C8); omitted fields fall
+  # back to DEFAULT_RETRY_POLICY (3 attempts, 500ms initial backoff, 2x
+  # multiplier, 30s cap, ±20% jitter).
+  large:
+    use: [llm]
+    build:
+      mode: "incremental"
+      excludeTests: true
+      outputLanguage: "en"
+      llmAnalysis: true
+      llmRequired: false
+      llmRetry:
+        maxAttempts: 3
+        initialBackoffMs: 500
+        backoffMultiplier: 2
+        maxBackoffMs: 30000
+        jitterRatio: 0.2
+
+  small:
+    use: [llm]
+    build:
+      mode: "incremental"
+      excludeTests: true
+      llmAnalysis: true
+      llmRetry:
+        maxAttempts: 2
+        initialBackoffMs: 300
+        maxBackoffMs: 10000
+
+  # Mock LLM profile for local repo-checkout verification. Keeps the pipeline
+  # deterministic while exercising the LLM enrichment code paths.
+  mock-llm:
+    use: [llm]
+    build:
+      mode: "incremental"
+      excludeTests: true
+      llmAnalysis: true
+      llmRequired: false

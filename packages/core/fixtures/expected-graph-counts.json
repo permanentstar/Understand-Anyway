@@ -1,0 +1,11 @@
+{
+  "description": "Deterministic build baseline for fixtures/sample-repo (drift probe). Regenerate intentionally when the fixture or upstream contract changes.",
+  "nodes": 14,
+  "edges": 12,
+  "edgesByType": {
+    "contains": 9,
+    "calls": 1,
+    "imports": 2
+  },
+  "importMapNonEmptyFiles": 2
+}

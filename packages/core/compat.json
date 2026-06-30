@@ -1,0 +1,122 @@
+{
+  "verifiedUpstreamVersion": "0.1.0",
+  "schemaFingerprint": {
+    "nodeTypes": [
+      "article",
+      "claim",
+      "class",
+      "concept",
+      "config",
+      "document",
+      "domain",
+      "endpoint",
+      "entity",
+      "file",
+      "flow",
+      "function",
+      "module",
+      "pipeline",
+      "resource",
+      "schema",
+      "service",
+      "source",
+      "step",
+      "table",
+      "topic"
+    ],
+    "edgeTypes": [
+      "authored_by",
+      "builds_on",
+      "calls",
+      "categorized_under",
+      "cites",
+      "configures",
+      "contains",
+      "contains_flow",
+      "contradicts",
+      "cross_domain",
+      "defines_schema",
+      "depends_on",
+      "deploys",
+      "documents",
+      "exemplifies",
+      "exports",
+      "flow_step",
+      "implements",
+      "imports",
+      "inherits",
+      "middleware",
+      "migrates",
+      "provisions",
+      "publishes",
+      "reads_from",
+      "related",
+      "routes",
+      "serves",
+      "similar_to",
+      "subscribes",
+      "tested_by",
+      "transforms",
+      "triggers",
+      "validates",
+      "writes_to"
+    ],
+    "graphRequiredFields": [
+      "edges",
+      "layers",
+      "nodes",
+      "project",
+      "tour",
+      "version"
+    ],
+    "graphOptionalFields": [
+      "kind"
+    ],
+    "nodeRequiredFields": [
+      "complexity",
+      "id",
+      "name",
+      "summary",
+      "tags",
+      "type"
+    ],
+    "nodeOptionalFields": [
+      "domainMeta",
+      "filePath",
+      "knowledgeMeta",
+      "languageNotes",
+      "lineRange"
+    ],
+    "edgeRequiredFields": [
+      "direction",
+      "source",
+      "target",
+      "type",
+      "weight"
+    ],
+    "edgeOptionalFields": [
+      "description"
+    ]
+  },
+  "requiredCoreExports": [
+    "TreeSitterPlugin",
+    "PluginRegistry",
+    "builtinLanguageConfigs",
+    "registerAllParsers",
+    "GraphBuilder",
+    "validateGraph",
+    "getChangedFiles",
+    "buildLayerDetectionPrompt",
+    "parseLayerDetectionResponse",
+    "applyLLMLayers",
+    "buildProjectSummaryPrompt",
+    "parseProjectSummaryResponse",
+    "buildTourGenerationPrompt",
+    "parseTourGenerationResponse"
+  ],
+  "requiredScripts": [
+    "scan-project.mjs",
+    "compute-batches.mjs",
+    "merge-batch-graphs.py"
+  ]
+}

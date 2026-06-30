@@ -1,0 +1,20 @@
+# Understand-Anyway gateway config (template)
+# Read-only gateway. Defaults are safe (localhost, no auth).
+
+host: 127.0.0.1
+port: 18666
+
+# Authentication. Default: none (NoAuthProvider).
+# Set provider to "oidc" and fill oidc.* to enable standard SSO, or load an
+# overlay provider (e.g. feishu) when available.
+auth:
+  provider: none
+  # oidc:
+  #   issuer: https://your-idp.example.com
+  #   clientId: ...
+  #   clientSecretEnv: UA_OIDC_CLIENT_SECRET   # read from env, never inline
+  #   redirectUri: https://your-host/callback
+
+# Record sink. Default: local files under the state dir.
+record:
+  provider: local

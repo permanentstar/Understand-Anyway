@@ -1,0 +1,14 @@
+# Understand-Anyway projects config (template)
+# Copy to your state dir and edit. Mirrors ~/understand-projects/config/projects.json
+# but in YAML. See docs for the JSON Schema.
+
+projectBaseDir: ".."
+
+projects:
+  - id: example
+    name: Example Project
+    # Source repo path. Supports ${projectBaseDir}, ${deployRoot}, ${projectId}, ${HOME}
+    repoPath: "${projectBaseDir}/example"
+    visible: true
+    # Optional: exclude test files from the graph (default true in prod).
+    excludeTests: true

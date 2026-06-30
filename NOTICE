@@ -1,0 +1,17 @@
+Understand-Anyway
+
+This project is an unofficial, independent deployment & orchestration layer
+derived from and built on top of:
+
+  Understand-Anything
+  https://github.com/Egonex-AI/Understand-Anything
+  Licensed under the MIT License.
+  Copyright (c) Egonex / Lum1104
+
+Understand-Anyway does not bundle or redistribute upstream source or build
+artifacts. Understand-Anything is consumed as a runtime dependency that users
+install separately. Where this project relies on upstream contracts (graph
+schema, prompt/parser exports, pipeline scripts), the upstream MIT license and
+copyright are acknowledged here.
+
+Understand-Anyway is not affiliated with or endorsed by Egonex.

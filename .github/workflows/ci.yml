@@ -1,0 +1,193 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Daily upstream schema drift probe (best-effort; see ROADMAP "Upstream coupling").
+    - cron: "0 1 * * *"
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Main gate: fully deterministic, no upstream plugin and no LLM key required.
+  # This is the blocking check for every push / PR.
+  check:
+    name: typecheck + test + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Test
+        run: pnpm -r test
+
+      - name: Build
+        run: pnpm -r build
+
+      - name: D-line isolation guard
+        run: pnpm lint:isolation
+
+      - name: D-line isolation guard self-test
+        run: pnpm lint:isolation:test
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: D-line scripts lint (bash -n + shellcheck)
+        run: pnpm lint:scripts
+
+      - name: D-line scripts behavior tests
+        run: pnpm test:scripts
+
+      - name: Repo-wide leak guard
+        # Scans the entire repo (docs, scripts, packages) for
+        # private-fingerprint markers we never want shipped publicly:
+        #   - 10.* IPs (private network leftovers; documentation IPs use
+        #     RFC5737 198.51.100.0/24 and 203.0.113.0/24)
+        #   - Absolute /Users/<dev-name>/... paths baked into committed files.
+        # Private deployments can add stricter denylist regexes through
+        # UA_LEAK_GUARD_EXTRA_PATTERN without committing those markers here.
+        # Re-uses git ls-files so anything in .gitignore (node_modules / dist /
+        # build artifacts) is skipped.
+        run: |
+          set -eo pipefail
+          patterns=(
+            '10\.[0-9]+\.[0-9]+\.[0-9]+'
+            '/Users/[A-Za-z0-9._-]+/'
+          )
+          if [ -n "${UA_LEAK_GUARD_EXTRA_PATTERN:-}" ]; then
+            patterns+=("$UA_LEAK_GUARD_EXTRA_PATTERN")
+          fi
+          pattern="$(IFS='|'; echo "${patterns[*]}")"
+          set +e
+          output="$(git grep -nE "$pattern" -- . 2>&1)"
+          grep_status=$?
+          set -e
+          if [ "$grep_status" -eq 0 ]; then
+            printf '%s\n' "$output"
+            echo "::error::leak guard: private-fingerprint pattern matched (see lines above)"
+            exit 1
+          fi
+          if [ "$grep_status" -ne 1 ]; then
+            printf '%s\n' "$output"
+            echo "::error::leak guard: invalid pattern or grep failure"
+            exit 1
+          fi
+          echo "leak guard: clean"
+
+  # Upstream-dependent regression: builds the in-repo fixture with the real
+  # upstream plugin and compares node/edge counts against the committed baseline
+  # (drift probe; see ROADMAP "Upstream coupling"). Best-effort: it skips cleanly
+  # when the fixture / baseline / upstream plugin are not present, so it never
+  # blocks the main gate. Wired end-to-end in C3.
+  fixture-regression:
+    name: fixture graph regression (best-effort)
+    needs: check
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm -r build
+
+      - name: Resolve upstream plugin
+        id: upstream
+        run: |
+          ROOT="${UA_PLUGIN_ROOT:-$HOME/.understand-anything-plugin}"
+          if [ -d "$ROOT" ] && [ -f "$ROOT/package.json" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "root=$ROOT" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "upstream plugin not found at $ROOT - skipping fixture regression"
+          fi
+
+      - name: Build fixture + compare counts
+        if: steps.upstream.outputs.available == 'true'
+        env:
+          UA_PLUGIN_ROOT: ${{ steps.upstream.outputs.root }}
+        run: pnpm --filter @understand-anyway/core test fixture-regression
+
+  # Schema drift probe: extracts the live upstream graph-schema fingerprint and
+  # diffs it against the committed compat.json baseline (see ROADMAP "Upstream coupling").
+  # Best-effort like fixture-regression: skips cleanly when no upstream plugin
+  # is installed, so it never blocks the main gate. Surfaced primarily via the
+  # daily `schedule` run; fatal drift fails this job (non-blocking) for triage.
+  compat-drift:
+    name: upstream schema drift probe (best-effort)
+    needs: check
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm -r build
+
+      - name: Resolve upstream plugin
+        id: upstream
+        run: |
+          ROOT="${UA_PLUGIN_ROOT:-$HOME/.understand-anything-plugin}"
+          if [ -d "$ROOT" ] && [ -f "$ROOT/package.json" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "root=$ROOT" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "upstream plugin not found at $ROOT - skipping compat drift probe"
+          fi
+
+      - name: Probe schema drift
+        if: steps.upstream.outputs.available == 'true'
+        env:
+          UA_PLUGIN_ROOT: ${{ steps.upstream.outputs.root }}
+        run: node packages/cli/dist/cli.js compat --plugin-root "$UA_PLUGIN_ROOT"

@@ -1,0 +1,30 @@
+{
+  "name": "@understand-anyway/gateway",
+  "version": "0.0.1",
+  "description": "Read-only gateway/portal serving knowledge graphs and dashboards over a shared public port.",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@understand-anyway/plugin-api": "workspace:*",
+    "ajv": "^8.17.1"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}

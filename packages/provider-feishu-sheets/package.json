@@ -1,0 +1,29 @@
+{
+  "name": "@understand-anyway/provider-feishu-sheets",
+  "version": "0.0.1",
+  "description": "Optional Feishu (Lark) Sheets record sink implementing the RecordProvider contract over public Feishu endpoints. Generic, config-driven column layout.",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@understand-anyway/plugin-api": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}

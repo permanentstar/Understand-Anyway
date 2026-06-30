@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://understand-anyway.dev/schemas/registry.schema.json",
+  "title": "Understand-Anyway project registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "projects"],
+  "properties": {
+    "version": { "type": "integer" },
+    "updatedAt": { "type": ["string", "null"] },
+    "projects": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/record" }
+    }
+  },
+  "definitions": {
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "projectRoot": { "type": "string" },
+        "stateRoot": { "type": "string" },
+        "accessUrl": { "type": "string" },
+        "dashboardUrl": { "type": "string" },
+        "internalUrl": { "type": "string" },
+        "publicPath": { "type": "string" },
+        "runtimeMode": { "type": "string", "enum": ["prod", "dev", ""] },
+        "prodDistDir": { "type": "string" },
+        "prodToken": { "type": "string" },
+        "status": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    }
+  }
+}

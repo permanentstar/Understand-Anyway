@@ -1,0 +1,30 @@
+{
+  "name": "@understand-anyway/core",
+  "version": "0.0.1",
+  "description": "Multi-project orchestration pipeline for Understand-Anyway (scan/batch/merge orchestration over upstream Understand-Anything).",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "compat.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@understand-anyway/plugin-api": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  }
+}
