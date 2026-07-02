@@ -1,0 +1,438 @@
+packages/core/src/build/checkpoint.ts
+  s_24138cf53d65da::t_e188b98a3b9185 33-40
+  s_24138cf53d65da::t_9f6951d904dfc8 48-75
+packages/core/src/compat/index.ts
+  s_24138cf53d65da::t_e538ecd2216223 1
+packages/cli/src/dashboard-prod/build-dashboard-dist.ts
+  s_24138cf53d65da::t_f002781cb48300 142
+packages/core/fixtures/expected-graph-counts.json
+  s_24138cf53d65da::t_baaa025e106eb3 2
+packages/cli/src/compat.ts
+  s_24138cf53d65da::t_d5a9a8c1adb5cd 2
+packages/core/src/fixture-regression.test.ts
+  s_24138cf53d65da::t_113c7d90133dfa 2
+packages/cli/package.json
+  s_24138cf53d65da::t_987277def53774 32-42
+packages/cli/src/build.test.ts
+  s_eefd06d518f4a0::t_339708300fb243 374-376
+  s_eefd06d518f4a0::t_044d75eeebe59d 337-338,361-373
+  s_eefd06d518f4a0::t_66a31f552b49f8 346-359
+packages/core/src/index.ts
+  s_24138cf53d65da::t_da73bd496262a9 6
+packages/gateway/src/versioning/state.ts
+  s_24138cf53d65da::t_bc88637610d652 183-215
+  s_eefd06d518f4a0::t_8452cc3f685457 148
+  s_eefd06d518f4a0::t_bef8a6a885aca3 147,149
+  s_24138cf53d65da::t_4fb92b941f7456 3
+packages/core/src/build/batches.ts
+  s_24138cf53d65da::t_9af0b0eedb2d56 95-101
+.github/workflows/ci.yml
+  s_24138cf53d65da::t_a962267f9b6495 148
+  s_eefd06d518f4a0::t_78b1dd72016183 83,86,88,93-96
+  s_24138cf53d65da::t_25312cd2ce4927 64
+  s_eefd06d518f4a0::t_6fa12c3d983612 75-76,78,82
+  s_24138cf53d65da::t_f2dbc6cec5ea36 101
+  s_24138cf53d65da::t_a63c7d06f6700a 63,65-67,71,73-74,89,97
+  s_24138cf53d65da::t_4adf849addb938 9
+  s_eefd06d518f4a0::t_4dc9d5c8108a79 68-70,72,77,79-81
+  s_eefd06d518f4a0::t_de2e3ed969c08c 84
+  s_eefd06d518f4a0::t_563a7ad7a8acd0 85,87,92
+packages/core/src/compat/fingerprint.ts
+  s_24138cf53d65da::t_711f9eaf362344 2
+CONTRIBUTING.md
+  s_24138cf53d65da::t_1e1162f315c8df 1-3,5-8
+  s_24138cf53d65da::t_ecb61ac0d38367 4
+packages/core/src/build/llm.ts
+  s_24138cf53d65da::t_33f3f560e91b63 234,723
+  s_eefd06d518f4a0::t_7d54b84a71012f 599-622,630,633
+  s_24138cf53d65da::t_3ca2862aa49d3f 241
+  s_eefd06d518f4a0::t_df4094c1415955 628-629,631-632,634-635
+packages/core/src/build/llm.test.ts
+  s_24138cf53d65da::t_82a9ae27e0ae1b 98
+  s_eefd06d518f4a0::t_0c96e714a29b11 375-398
+packages/cli/src/dashboard-shared/url.test.ts
+  s_24138cf53d65da::t_f6e241462de23e 1-36
+packages/core/src/build/repair.test.ts
+  s_24138cf53d65da::t_f7dd8a74f85d4a 211
+packages/core/src/build/pipeline.test.ts
+  s_24138cf53d65da::t_74761b77410d9f 633-669
+packages/cli/src/build.ts
+  s_eefd06d518f4a0::t_0cc36082b6c617 111,168-172
+  s_24138cf53d65da::t_d50f77b44a9d8b 46
+  s_eefd06d518f4a0::t_663e0339e8b42b 76-81
+  s_eefd06d518f4a0::t_f50672e3e2149b 54-61,110,112-167
+packages/cli/src/gateway/project-state.test.ts
+  s_24138cf53d65da::t_ee4a1a86d080d9 63-83
+docs/release-tests/local/repo-checkout/runbook.md
+  s_24138cf53d65da::t_ecd9fc463fdd6d 121-133
+  s_24138cf53d65da::t_6f1e93f0262816 11-13
+  s_59e89969bfa187::t_1a3b0d1fe74f26 3-4
+packages/cli/src/builtin-llm.ts
+  s_24138cf53d65da::t_1b40fa23fd15f9 210-211
+  s_24138cf53d65da::t_6655faa9d444b2 145
+  s_24138cf53d65da::t_441175a6c7ec03 135
+  s_24138cf53d65da::t_2a4858f8294618 156-172
+packages/plugin-api/package.json
+  s_24138cf53d65da::t_af617be48bfe74 16-17
+docs/release-tests/local/shared-gateway/plan.md
+  s_eefd06d518f4a0::t_ea56162dbf97f4 29
+packages/cli/src/config/load.ts
+  s_eefd06d518f4a0::t_baff7b36ebea61 47,49-50
+  s_eefd06d518f4a0::t_78468e90158591 19-39,48
+packages/gateway/src/versioning/project-state.test.ts
+  s_eefd06d518f4a0::t_eaf5830955c67c 1,184-197,215-217
+  s_24138cf53d65da::t_5a4b5e2a5f639b 165-172
+  s_eefd06d518f4a0::t_7024032fb32f9c 13,198-214
+  s_24138cf53d65da::t_389f3887958166 6-12,14-19
+  s_24138cf53d65da::t_ef236f7eb9c1ae 173-183,218-248
+  s_eefd06d518f4a0::t_7ed5af24d6e8fa 81-129
+packages/gateway/src/prod-data-api.test.ts
+  s_eefd06d518f4a0::t_88694ffa4b1a2b 99-104,164
+  s_eefd06d518f4a0::t_58c9c136f8bd40 1,3-73,165
+  s_eefd06d518f4a0::t_597aa5ed910d6a 2,74-97
+  s_eefd06d518f4a0::t_df69c90bad0b2a 105-135,137-139,141-142,144-162
+  s_eefd06d518f4a0::t_f0787711c7a2d1 136,140,143,163
+scripts/release.mjs
+  s_24138cf53d65da::t_61bbb7f83a5c55 5,99,101-111,113-118,236-237,248,252-254,256-257,259,401
+  s_24138cf53d65da::t_d2db835b9f84e5 230,374,413-420
+  s_24138cf53d65da::t_4bd9927bfd4810 14-16,23,36-37,42,53,58,61-63,74,89-96,238,240-241,243-247,249-251,260-265,267,269,277-280,283,287,294-297,300,307-308,310-314,335-343,352-353,356,358-360,369-370,377-378
+  s_eefd06d518f4a0::t_535011e69ff2ec 389-400
+  s_24138cf53d65da::t_a897a7a4812bf6 20-21,306
+  s_24138cf53d65da::t_ffab167c702b73 143,145,149-151,161-162
+  s_24138cf53d65da::t_a3a57c9ef65fe0 112,140-142,144,146-148,155-160
+  s_24138cf53d65da::t_97273f1d030631 1-4,6,13,22,29-30,32,34-35,39,43-47,51-52,56-57,71-73,87-88,97-98,429
+  s_24138cf53d65da::t_afff2e57bc30db 9,281,284-285
+  s_24138cf53d65da::t_74def2f5599906 7-8,33,239,242,258,309,357,371-373,375-376,379-381
+  s_24138cf53d65da::t_de224650a93f5f 152-154,215-216,219
+  s_24138cf53d65da::t_df7a2c1a4dbbb0 17-19,24-28
+  s_eefd06d518f4a0::t_bd9b2baaa23bb8 365
+  s_24138cf53d65da::t_82012f5c5d5846 382-386
+  s_24138cf53d65da::t_6ed094662f2da3 66-70,80-86
+  s_24138cf53d65da::t_358d890dc33e98 201-212,217-218,220-225
+  s_24138cf53d65da::t_328ed67271154a 31,49-50,54-55,282,286,344-345,354-355,403-409,412,425-428
+  s_eefd06d518f4a0::t_24fec81265260c 388
+  s_24138cf53d65da::t_0225fe913b22d6 10-12,38,40-41,48,59-60,64-65,75-79,100,119-139,163-200,213-214,226-229,231-235,255,266,268,270-276,288-293,298-299,301-305,315-334,346-351,361-364,366-368,402,410-411,421-424
+packages/cli/src/gateway/project-state.ts
+  s_24138cf53d65da::t_bc043db64cbf3d 5-52
+packages/gateway/src/portal-events.test.ts
+  s_24138cf53d65da::t_ae1fcaebaa2cca 54
+packages/gateway/src/prod-data-api.ts
+  s_eefd06d518f4a0::t_ed3195483ac5ea 22,108-113,120-121
+  s_eefd06d518f4a0::t_5dd6d827c131cf 26,78
+  s_eefd06d518f4a0::t_cdd1dadf0842c2 27-57,65-77,79,81,87-88
+  s_eefd06d518f4a0::t_b212c7636096bb 159-160
+  s_eefd06d518f4a0::t_7741e46f849aaa 101-104
+  s_eefd06d518f4a0::t_8c772ac9f8f373 163,165-180,182-243
+  s_eefd06d518f4a0::t_6394cc2e9b111a 25,58-64,80,82-86,89-97,114-119,141-153,162,164,181,244-245
+docs/local-release-verification.md
+  s_24138cf53d65da::t_51e52046af1a38 328
+  s_24138cf53d65da::t_43f83b990e1179 327
+  s_eefd06d518f4a0::t_c9c5ff16c7b29f 118-136,141
+  s_59e89969bfa187::t_563e30eda46775 270-275,278-282
+  s_eefd06d518f4a0::t_e840356e07b815 296
+  s_24138cf53d65da::t_013cd0120ce5f7 20
+  s_24138cf53d65da::t_d6b89c01602f8b 24
+  s_24138cf53d65da::t_64b7872eae55e4 276-277
+  s_eefd06d518f4a0::t_04465af057f6cc 93-97,326
+  s_eefd06d518f4a0::t_343a902d111a61 138,144-145,289-290
+packages/plugin-api/src/notify.test.ts
+  s_24138cf53d65da::t_3b0446e9c562c4 2
+packages/cli/src/config/load.test.ts
+  s_eefd06d518f4a0::t_0cdfe68a27b521 80-88
+  s_eefd06d518f4a0::t_2dba00f3a9b256 89-98
+packages/gateway/src/server.test.ts
+  s_eefd06d518f4a0::t_64be83a2651ec3 231
+  s_24138cf53d65da::t_5be59a70a47888 9
+  s_24138cf53d65da::t_a9f99a0326fffb 1-6
+  s_24138cf53d65da::t_2b06bb86e63832 449-553
+scripts/__tests__/release.test.mjs
+  s_24138cf53d65da::t_6b9f0832094da1 114-118,129-130
+  s_24138cf53d65da::t_9e5dae09d8b7d2 1-5,20-50,64-94,275-277
+  s_24138cf53d65da::t_c4f4634114b511 6-7,9,12,14,16-19,57-63,103-111,132-203
+  s_24138cf53d65da::t_5f1a4990ed857d 8,11,218-237,245-274
+  s_24138cf53d65da::t_2c846813fa9961 51-56
+  s_24138cf53d65da::t_322f63602570ef 131,238-244
+  s_eefd06d518f4a0::t_7cada98ead90ad 13,209-216
+  s_24138cf53d65da::t_a2868dce2f97d3 95-102,112-113,119-128
+  s_eefd06d518f4a0::t_b4fec777b6a92c 217
+  s_24138cf53d65da::t_14221de6927328 10,15,204-208
+docs/release-tests/local/npm-verdaccio/plan.md
+  s_eefd06d518f4a0::t_ec9e623c3fd978 26
+package.json
+  s_24138cf53d65da::t_7b66d1a5629d5c 27
+  s_24138cf53d65da::t_1921404650767a 25
+  s_59e89969bfa187::t_99c57336c61806 26
+  s_24138cf53d65da::t_91b260ec0ca21f 13-14
+packages/cli/src/dashboard-prod/dashboard-start.test.ts
+  s_24138cf53d65da::t_2cf29238836b83 202-239
+packages/cli/src/repair/index.ts
+  s_eefd06d518f4a0::t_fb0dce31fc4f91 52-56
+packages/gateway/src/notify-local.ts
+  s_24138cf53d65da::t_313462ad31fbc3 1-56
+packages/gateway/src/versioning/state.test.ts
+  s_eefd06d518f4a0::t_fccad9a5d75398 60-66
+  s_24138cf53d65da::t_7ae2ac46456207 284-295
+docs/release-tests/local/repo-checkout/expected-layout.md
+  s_24138cf53d65da::t_ed7e207bc4c123 3
+scripts/lib/__tests__/discover-projects.test.mjs
+  s_24138cf53d65da::t_5642858833711e 159-191
+packages/core/src/compat/check.ts
+  s_24138cf53d65da::t_bca0319e4df2a9 2
+docs/release-tests/README.md
+  s_59e89969bfa187::t_c796e37491a832 47-52
+  s_eefd06d518f4a0::t_a7d35a5576aaf9 26
+  s_59e89969bfa187::t_0dc1d86bda73d3 7-14,17-22,25
+  s_24138cf53d65da::t_67ac7522f45d33 15-16,23-24
+packages/cli/src/dashboard-shared/url.ts
+  s_24138cf53d65da::t_be386f52c2ff0f 8-24
+packages/gateway/src/index.ts
+  s_24138cf53d65da::t_805856afbd6042 124-127
+  s_24138cf53d65da::t_6dc95194bace96 162-182
+packages/plugin-api/src/notify.ts
+  s_24138cf53d65da::t_5e27edf88eab30 4-8
+scripts/lint-isolation.test.mjs
+  s_24138cf53d65da::t_1105bf19e41654 134-193
+packages/cli/src/batch-mapper-worker.ts
+  s_eefd06d518f4a0::t_e464310702b026 139-144
+  s_eefd06d518f4a0::t_cbe389c344fdab 29-111,164-212
+packages/gateway/src/versioning/project-state.ts
+  s_eefd06d518f4a0::t_f1e211d2137988 284-311,356-402,421-444,460-465,475,478
+  s_24138cf53d65da::t_f1b5a60c1bdc84 10
+  s_24138cf53d65da::t_dacd1e53359bdb 130-133
+  s_24138cf53d65da::t_1bf86e10c5dd8d 318-332
+  s_24138cf53d65da::t_9a4609ecff910d 404-420,445-459,484
+  s_eefd06d518f4a0::t_96ef1abb84e7ba 466-472,474,476-477,479-483
+  s_24138cf53d65da::t_6ad42580c234dd 519-521
+  s_eefd06d518f4a0::t_68c6a716b6e3bd 473
+  s_24138cf53d65da::t_a287ec97caff8e 154-184
+README.md
+  s_24138cf53d65da::t_b440c04ced166b 27-99
+  s_24138cf53d65da::t_6f59671be45348 107
+packages/cli/src/build-record.ts
+  s_24138cf53d65da::t_287b46b328a36f 7-111
+scripts/lint-isolation.mjs
+  s_24138cf53d65da::t_2fcdd857fbb5e6 102-108
+  s_24138cf53d65da::t_f3051e2304ca82 5
+packages/cli/src/notify/index.ts
+  s_24138cf53d65da::t_6d1b1c271b7735 26-29
+packages/gateway/src/prod-static.ts
+  s_eefd06d518f4a0::t_465367fb81ca99 43-48,67-68,83-84,102-104,110-122,124
+  s_eefd06d518f4a0::t_a84922b3f557ba 13-14,16-17,24-27,49-53,56-60,63-66,105-109,123
+  s_24138cf53d65da::t_70141a0c2de59e 33-42,69,81,101
+  s_eefd06d518f4a0::t_712b955f85b9f6 22-23,54-55,61-62
+  s_eefd06d518f4a0::t_eb3453bbfda007 10
+  s_24138cf53d65da::t_88958d322456c7 9,11-12,15,18-21,28-32,70-80
+  s_eefd06d518f4a0::t_ebda320f0b19e5 85,91-98
+  s_eefd06d518f4a0::t_827efefbbe48eb 82,86-90,99-100
+docs/contributing.md
+  s_24138cf53d65da::t_4d619fabbc4b78 113-127,131-134,141,151,170-181
+  s_24138cf53d65da::t_bce77287cdc2b1 59,62,65,68-71,80,82-85
+  s_24138cf53d65da::t_03e1a6e7c8383e 135
+  s_24138cf53d65da::t_14c4a50f263a05 144-146
+  s_eefd06d518f4a0::t_43c5b5dcf0c65f 163-169
+  s_24138cf53d65da::t_ced9cfdab45b1b 136-140,142-143,152-154,162
+  s_24138cf53d65da::t_4542925a5cdc38 129,158-161
+  s_24138cf53d65da::t_cad9a548144ea4 147
+  s_24138cf53d65da::t_be353f10fe71b5 3-58,60-61,63-64,66-67,72-79,81,86-111
+  s_24138cf53d65da::t_b953a03c92f3c1 128,130,148-150,155-157
+scripts/local-delivery-tests.mjs
+  s_59e89969bfa187::t_010b0f11b59988 469-487
+  s_59e89969bfa187::t_e77840d331d8bf 564
+  s_24138cf53d65da::t_4444e33c22a34a 62-63
+  s_59e89969bfa187::t_94b693cd120e1e 351
+  s_eefd06d518f4a0::t_1db53a0b11c9d0 243-265,525-528,530-532,540
+  s_59e89969bfa187::t_ae491922385be6 624-628,632-648
+  s_24138cf53d65da::t_e0e6fd7eb26bcb 629-630
+  s_eefd06d518f4a0::t_09d3f16a4d4dfd 545-552
+  s_24138cf53d65da::t_bd458a422a9b4a 13-16
+  s_24138cf53d65da::t_97618f53788591 100
+  s_59e89969bfa187::t_7f0a9787702c59 513-524,529,533
+packages/cli/src/build-record.test.ts
+  s_24138cf53d65da::t_8f413be849c287 51-91
+docs/release-tests/local/npm-verdaccio/runbook.md
+  s_24138cf53d65da::t_02923ab8d02094 10
+  s_eefd06d518f4a0::t_91a89bdcc0b685 18-29,43
+  s_24138cf53d65da::t_ed097dbe596301 35-42,44-45
+  s_59e89969bfa187::t_10790786e7beab 3-4
+packages/gateway/src/notify-local.test.ts
+  s_24138cf53d65da::t_9e8d1d61ebf29f 1-74
+packages/cli/src/projects-config.ts
+  s_24138cf53d65da::t_eddc1289e67f3d 327
+packages/plugin-api/README.md
+  s_24138cf53d65da::t_10e19a59e3b6fd 110-143
+  s_24138cf53d65da::t_c115ce4e6b945a 153-156
+packages/cli/src/cli.ts
+  s_eefd06d518f4a0::t_610a3967716700 44-47,49-52
+  s_eefd06d518f4a0::t_c95633357d486f 48
+  s_eefd06d518f4a0::t_52e5ec28b46c14 29
+packages/cli/src/dashboard-prod/index.ts
+  s_24138cf53d65da::t_ba3ec57e2634d1 100-104
+scripts/nightly-project-sync.sh
+  s_eefd06d518f4a0::t_73569d63c40937 363-414 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a45dc71a425919c36d4642a","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Range":[363,414]}]}]}
+docs/deployment.md
+  s_24138cf53d65da::t_93fd70b9472d73 8
+  s_24138cf53d65da::t_d37243a838aacf 202
+packages/cli/src/dashboard-shared/dashboard-patch.ts
+  s_24138cf53d65da::t_9bdf4367a23965 4-9
+docs/release-tests/local/repo-checkout/plan.md
+  s_24138cf53d65da::t_1a738864da680e 19
+scripts/lib/discover-projects.mjs
+  s_24138cf53d65da::t_e0dede7341c043 4-7
+  s_24138cf53d65da::t_3abacc24cc40f9 78-87
+  s_24138cf53d65da::t_1b8cde916eef8d 99
+packages/cli/src/args.test.ts
+  s_eefd06d518f4a0::t_a46ce7a48b385d 291-307,309-313
+  s_eefd06d518f4a0::t_8e3c3593777e5e 308
+  s_24138cf53d65da::t_b065f811ab2619 965-976
+packages/gateway/src/prod-static.test.ts
+  s_eefd06d518f4a0::t_f417c3030333d5 2,9-14,19-24,33,91-130
+  s_eefd06d518f4a0::t_ab0450f373d8ab 1,3-8,15-18,25-32,34-90,131-133
+docs/release-tests/local/shared-gateway/runbook.md
+  s_24138cf53d65da::t_9dd8d1df0813f1 46-57
+  s_24138cf53d65da::t_dbe83460706ad4 10
+  s_59e89969bfa187::t_c8d6225f49730e 3-4
+packages/core/src/build/batch-mode-decide.ts
+  s_24138cf53d65da::t_624f5d652b912c 4-6
+packages/core/src/build/pipeline.ts
+  s_24138cf53d65da::t_6c8e86d1a4965f 660
+  s_24138cf53d65da::t_8e01a273f77fce 732
+  s_24138cf53d65da::t_2d58384889d48d 182
+  s_24138cf53d65da::t_0c2676928ebc6a 813
+  s_24138cf53d65da::t_2a1c50db64c282 555
+  s_24138cf53d65da::t_666cbfecf87cfe 710
+  s_24138cf53d65da::t_fcd53079f3235e 654
+  s_24138cf53d65da::t_1cf5f7527d7650 924-932
+  s_24138cf53d65da::t_d0b2e5d99deac0 445
+  s_24138cf53d65da::t_9b263269330388 478,678
+  s_24138cf53d65da::t_723685ce832ae8 794
+  s_24138cf53d65da::t_20ea7cc4972291 736-742,744-752,754-759,761-763
+  s_24138cf53d65da::t_99aadcf97761c7 743,753,760
+  s_24138cf53d65da::t_5e6fc7bd368ae9 867
+  s_24138cf53d65da::t_debcd86d791e2b 855
+packages/gateway/src/project-router.ts
+  s_eefd06d518f4a0::t_c3f63c4f431a06 34-51,54-55,183
+  s_eefd06d518f4a0::t_1023d5c689d951 119-126,184-186
+  s_eefd06d518f4a0::t_09c07cac7a49f9 13,52-53
+packages/gateway/src/project-router.test.ts
+  s_eefd06d518f4a0::t_4eda2f42c32087 152,297,307,335
+  s_eefd06d518f4a0::t_56ed7d38debdb9 68-71,200-237
+  s_eefd06d518f4a0::t_aa12b4e60bdbc6 182-199,238-239
+  s_eefd06d518f4a0::t_814c9a6ad939aa 62-67,298-299,308-309
+  s_eefd06d518f4a0::t_e794b1e1191fe4 240-277
+.gitignore
+  s_24138cf53d65da::t_f0ab3d971149a7 10-20
+packages/core/src/compat/diff.ts
+  s_24138cf53d65da::t_8aecb3d9ac047c 2
+packages/cli/src/builtin-llm.test.ts
+  s_24138cf53d65da::t_d60b8286eb513e 5
+  s_24138cf53d65da::t_04e5597524e627 52-70
+pnpm-lock.yaml
+  s_24138cf53d65da::t_99b30e2e679dac 41-44
+packages/core/src/upstream.ts
+  s_24138cf53d65da::t_8279130c8f990c 5
+  s_24138cf53d65da::t_50030fec412363 222
+packages/cli/src/args.ts
+  s_24138cf53d65da::t_e7769b039bcc86 541-542,544-545
+  s_24138cf53d65da::t_6789920634950a 1118-1165
+  s_eefd06d518f4a0::t_ac2b9f19c1c318 767-768
+  s_24138cf53d65da::t_f6291f261c3ff9 543
+  s_24138cf53d65da::t_be0b7b00d4a56d 246-283
+packages/cli/src/batch-mapper-worker.test.ts
+  s_eefd06d518f4a0::t_10121af954d3ba 65-80
+  s_eefd06d518f4a0::t_148faf0df1afd5 29-50,114-151
+packages/cli/src/serve.ts
+  s_24138cf53d65da::t_bcd4031ba63ba3 52
+  s_eefd06d518f4a0::t_893f892f8e858e 186-190
+  s_24138cf53d65da::t_b1e7779c4fb01c 241
+packages/cli/src/dashboard-prod/dashboard-start.ts
+  s_24138cf53d65da::t_c5e19f29169c64 294
+  s_24138cf53d65da::t_985f2a3e12ea22 34
+  s_24138cf53d65da::t_cc2d06ac1f29e2 331
+  s_24138cf53d65da::t_cc4fd21ee00e7c 308
+packages/gateway/src/server.ts
+  s_24138cf53d65da::t_b335b4ec1e8a8a 238-267
+  s_eefd06d518f4a0::t_e8eff8300b8e52 223-224
+docs/ROADMAP.md
+  s_24138cf53d65da::t_40a1309158fab5 58-59
+  s_24138cf53d65da::t_c4c986a26b1f4f 1-57,60-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7b88c86593fa44bd9edc6239d3c4cbfb112ba477",
+  "prompts": {},
+  "sessions": {
+    "s_24138cf53d65da": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a43853ca425919c36d4248e",
+        "model": "gpt-5.5__max",
+        "display_model_name": "GPT-5.5"
+      },
+      "human_author": null
+    },
+    "s_59e89969bfa187": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a3f8b38824facab64967146",
+        "model": "openrouter-2o__dev"
+      },
+      "human_author": "permanentstar <permanent.star@gmail.com>"
+    },
+    "s_eefd06d518f4a0": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a452294a425919c36d43c28",
+        "model": "gpt-5.5__max"
+      },
+      "human_author": null
+    }
+  },
+  "attestation_metadata": {
+    "scripts/nightly-project-sync.sh": [
+      {
+        "hash": "s_eefd06d518f4a0::t_73569d63c40937",
+        "line_ranges": [
+          {
+            "Range": [
+              363,
+              414
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a45dc71a425919c36d4642a",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Range": [
+                  363,
+                  414
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "s_eefd06d518f4a0": {
+      "tool": "trae",
+      "conversation_id": "6a452294a425919c36d43c28",
+      "session_id": "6a452294a425919c36d43c28",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_eefd06d518f4a0::t_73569d63c40937": {
+      "tool": "trae",
+      "conversation_id": "6a452294a425919c36d43c28",
+      "session_id": "6a452294a425919c36d43c28",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
