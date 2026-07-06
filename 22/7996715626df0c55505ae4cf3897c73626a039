@@ -1,0 +1,27 @@
+docs/release-tests/external/README.md
+  s_eefd06d518f4a0::t_9b1797de9d5ef7 18,27-30
+docs/release-tests/external/ppe/runbook.md
+  s_eefd06d518f4a0::t_2c59381987fa6b 10,17,20,31,43,56,64-65,72-88
+docs/deployment-cli.md
+  s_eefd06d518f4a0::t_12e33644baed39 191-208
+  s_eefd06d518f4a0::t_44225f0652afb0 11-12
+  s_eefd06d518f4a0::t_5d2770df696198 209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "227996715626df0c55505ae4cf3897c73626a039",
+  "prompts": {},
+  "sessions": {
+    "s_eefd06d518f4a0": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a452294a425919c36d43c28",
+        "model": "openrouter-3o__max"
+      },
+      "human_author": "permanentstar <permanent.star@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
