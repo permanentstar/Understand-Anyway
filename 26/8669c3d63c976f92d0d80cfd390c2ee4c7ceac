@@ -1,0 +1,58 @@
+scripts/release-gate-ppe-verdaccio.mjs
+  s_eefd06d518f4a0::t_e769a7d32c9537 183-184,186-187
+  s_eefd06d518f4a0::t_528e3a4a971e47 200-202
+  s_eefd06d518f4a0::t_e38a780282a41e 199,203
+scripts/__tests__/release-gate-ppe.test.mjs
+  s_eefd06d518f4a0::t_11394e69bff8b7 85-86,88,90-91
+  s_eefd06d518f4a0::t_7cd2125dac9de8 87,89
+  s_eefd06d518f4a0::t_1c11c29ff9b957 110-125
+  s_eefd06d518f4a0::t_923f9e2a8beecb 126-127
+scripts/release-gate-ppe.mjs
+  s_eefd06d518f4a0::t_762d17cc2c48a4 353
+  s_eefd06d518f4a0::t_02436508239c94 436,438-446,452-458,463,467-472
+  s_eefd06d518f4a0::t_1e7c5c32a65b73 331-333,343-344,369-389,393
+  s_eefd06d518f4a0::t_a2061c5e483fa0 341
+  s_eefd06d518f4a0::t_01a3673ea8743a 342,345
+  s_eefd06d518f4a0::t_14a28bae0e8644 249-253
+  s_eefd06d518f4a0::t_67ef5eddb0d140 8-15
+  s_eefd06d518f4a0::t_d38e19ae5cfc38 501-502,517
+  s_eefd06d518f4a0::t_64d4eda061fecd 391
+  s_eefd06d518f4a0::t_c0bd235d495f3d 3
+  s_eefd06d518f4a0::t_716179aba17305 390,394
+  s_eefd06d518f4a0::t_4f605a1609e8b7 93-95,109-111
+  s_eefd06d518f4a0::t_150a755eddf3d9 235-240,247-248,255-273,320-321,323-324,326,335-336,340,346-350
+  s_eefd06d518f4a0::t_9afac71adf753b 410-411
+  s_eefd06d518f4a0::t_44eb478930c75a 459-462,464-466
+  s_eefd06d518f4a0::t_86dfb78ede5c44 19-22
+  s_eefd06d518f4a0::t_c5d83ed37f95e9 6
+  s_eefd06d518f4a0::t_99950cd4006469 447-451
+  s_eefd06d518f4a0::t_b00a85a1d3a577 325
+  s_eefd06d518f4a0::t_601fb0bfeb4a37 301-304,310-319
+  s_eefd06d518f4a0::t_73aeca573aa383 430-434
+  s_eefd06d518f4a0::t_5321205772dbe2 330
+  s_eefd06d518f4a0::t_a563239dec37ac 503-516
+  s_eefd06d518f4a0::t_241c78f5d3d3d9 337-338
+  s_eefd06d518f4a0::t_5d068b75290cd3 322
+  s_eefd06d518f4a0::t_249ca6aa5567ad 7
+  s_eefd06d518f4a0::t_1a8c3bd70ea479 254
+  s_eefd06d518f4a0::t_3c0abaad16ce83 435
+  s_eefd06d518f4a0::t_7567cb984d722e 437
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "268669c3d63c976f92d0d80cfd390c2ee4c7ceac",
+  "prompts": {},
+  "sessions": {
+    "s_eefd06d518f4a0": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a452294a425919c36d43c28",
+        "model": "openrouter-3o__max"
+      },
+      "human_author": "permanentstar <permanent.star@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
