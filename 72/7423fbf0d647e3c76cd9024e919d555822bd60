@@ -1,0 +1,41 @@
+scripts/__tests__/daily-update.test.mjs
+  s_eefd06d518f4a0::t_dedaf31e966f7b 34,45-46,163,192,194,216,239,262,284,318,354,385,399,423,453,480
+  s_eefd06d518f4a0::t_cdbebc7df55466 30-33,35-44,193
+  s_eefd06d518f4a0::t_2dc029507facdb 196-214
+  s_eefd06d518f4a0::t_574d4f06d73701 195
+  s_eefd06d518f4a0::t_cfacce80697a99 215
+scripts/__tests__/nightly-project-sync.test.mjs
+  s_eefd06d518f4a0::t_f8a6294597c32b 76
+  s_eefd06d518f4a0::t_6fd363e22ff114 50
+  s_eefd06d518f4a0::t_393351930fd46f 59,65-75,77-78,189-212
+  s_eefd06d518f4a0::t_8e9698bc01cd52 37-49,51-58,60-64,79-88,151,169-170,308-309,315-319
+  s_eefd06d518f4a0::t_b11814df3a5638 125,132-136,214-249,320
+  s_eefd06d518f4a0::t_984a3477bd352d 213
+  s_eefd06d518f4a0::t_4f28c94eb440f0 250
+scripts/daily-update.sh
+  s_eefd06d518f4a0::t_5d898e797bb149 268
+scripts/nightly-project-sync.sh
+  s_eefd06d518f4a0::t_83d66f59d867bb 150-155,165,180-181,188
+  s_eefd06d518f4a0::t_985d75498e1ca9 189
+  s_eefd06d518f4a0::t_ee473df5bae3b9 186-187
+  s_eefd06d518f4a0::t_4b211f4cd73d98 5-8,32-34
+  s_eefd06d518f4a0::t_72f1a110392327 156-164,166-169,172-173,179,185,312
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "727423fbf0d647e3c76cd9024e919d555822bd60",
+  "prompts": {},
+  "sessions": {
+    "s_eefd06d518f4a0": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a452294a425919c36d43c28",
+        "model": "gpt-5.5__max"
+      },
+      "human_author": "permanentstar <permanent.star@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
