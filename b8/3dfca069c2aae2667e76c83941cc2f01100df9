@@ -1,0 +1,39 @@
+packages/cli/package.json
+  s_e575ca410b6108::t_e44ace41dac8a7 3
+packages/core/package.json
+  s_e575ca410b6108::t_541109d702f2db 3
+packages/gateway/package.json
+  s_e575ca410b6108::t_85a11d19aeb750 3
+packages/plugin-api/package.json
+  s_e575ca410b6108::t_2d21a5aa94a702 3
+packages/provider-cli-runtime/package.json
+  s_e575ca410b6108::t_1ed06e631e634d 3
+packages/provider-feishu-auth/package.json
+  s_e575ca410b6108::t_d327af4925612d 3
+packages/provider-feishu-sheets/package.json
+  s_e575ca410b6108::t_be24b9199a7d53 3
+packages/provider-lark-im-notify/package.json
+  s_e575ca410b6108::t_5714ea16d1ebf1 3
+packages/provider-trae-cli-v1/package.json
+  s_e575ca410b6108::t_f8771011ae7a89 3
+packages/provider-trae-cli-v2/package.json
+  s_e575ca410b6108::t_9a0b2f75670a37 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "b83dfca069c2aae2667e76c83941cc2f01100df9",
+  "prompts": {},
+  "sessions": {
+    "s_e575ca410b6108": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a54dd54caac80d00b3eb4a4",
+        "model": "gpt-5.4__dev"
+      },
+      "human_author": "permanentstar <permanent.star@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
