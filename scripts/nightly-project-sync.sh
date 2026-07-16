@@ -255,8 +255,14 @@ while IFS= read -r line; do
   # 2. commit gate: same commit + previous usable run → skipped. A prior
   # `skipped` already proves the current commit is covered, so keep skipping
   # instead of rebuilding every other run.
+  # Escape hatch: when the skip path would land on a project whose
+  # `current/dashboard-dist/` is missing (typical for freshly-migrated state
+  # roots or the first nightly after method-A introduction), fall through to
+  # a real build so `dashboard build-dist` + publish can heal the dist.
+  current_dist="$state_dir/current/dashboard-dist"
   if [[ -n "$current_commit" && "$current_commit" == "$prev_commit" \
-        && ( "$prev_status" == "success" || "$prev_status" == "skipped" ) ]]; then
+        && ( "$prev_status" == "success" || "$prev_status" == "skipped" ) \
+        && -d "$current_dist" ]]; then
     printf '[nightly-project-sync] project=%s commit=%s skipped (no change since previous usable run)\n' "$project_id" "${current_commit:0:12}"
     PROJECT_NAME="$project_id" REPO_PATH="$repo_path" STATE_DIR="$state_dir" \
     COMMIT="$current_commit" RUN_ID="$run_id" \

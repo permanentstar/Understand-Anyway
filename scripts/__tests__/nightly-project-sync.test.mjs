@@ -76,9 +76,40 @@ if [[ "$1" == "dashboard" && "$2" == "build-dist" ]]; then
   if [[ "${buildDistFailed}" == "true" ]]; then
     exit 3
   fi
+  # Simulate method-A staging: build-dist creates the flat <stateRoot>/dashboard-dist
+  # so a subsequent 'project-state publish' has something to promote.
+  state_root=""
+  project_id=""
+  for i in $(seq 1 $#); do
+    if [[ "\${!i}" == "--project" ]]; then
+      nxt=$((i+1)); project_id="\${!nxt}"
+    fi
+  done
+  # Best-effort resolve state root from UA_PROJECTS_ROOT (used in tests).
+  if [[ -n "$project_id" && -n "\${UA_PROJECTS_ROOT:-}" ]]; then
+    state_root="$UA_PROJECTS_ROOT/projects/$project_id"
+    mkdir -p "$state_root/dashboard-dist"
+  fi
   exit 0
 fi
 if [[ "$1" == "project-state" && "$2" == "publish" ]]; then
+  # Simulate promotion of flat staging into versions/<vid>/dashboard-dist and
+  # atomically flip the 'current' symlink so <stateRoot>/current/dashboard-dist
+  # exists after publish. Version id is passed positionally right after
+  # 'publish'; project id from --project.
+  version_id="$3"
+  project_id=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --project) project_id="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  if [[ -n "$project_id" && -n "\${UA_PROJECTS_ROOT:-}" && -n "$version_id" ]]; then
+    state_root="$UA_PROJECTS_ROOT/projects/$project_id"
+    mkdir -p "$state_root/versions/$version_id/dashboard-dist"
+    ln -sfn "$state_root/versions/$version_id" "$state_root/current"
+  fi
   exit 0
 fi
 if [[ "$1" == "review-graph-health" ]]; then
@@ -329,6 +360,51 @@ function runScript(args, env) {
       "skip-guard: build only ran once across three unchanged runs",
       buildLines.length === 1,
       buildLines.join("\n"),
+    );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+// --- Test 2c: skip guard self-heals when current/dashboard-dist is missing ---
+// Simulates a state root migrated from a legacy layout: same commit, previous
+// nightly succeeded, but `current/dashboard-dist/` was never created. The skip
+// path must fall through to a real build so dashboard build-dist + publish can
+// promote a fresh dist into the versioned target.
+{
+  const work = makeTmp();
+  try {
+    const projectsRoot = resolve(work, "projects");
+    const { binDir, logPath } = setupFakeBin(work);
+    const { stateDir } = setupOneProject(projectsRoot);
+
+    const env = {
+      ...process.env,
+      PATH: `${binDir}:${process.env.PATH}`,
+      UA_PROJECTS_ROOT: projectsRoot,
+      HOME: work,
+    };
+    runScript(["--no-pull"], env); // first: real build, seeds nightly-latest
+    const firstLog = readFileSync(logPath, "utf8");
+
+    // Delete the current/dashboard-dist that the first run would have promoted
+    // (fake bin doesn't actually create one; simulate the legacy state root
+    // where publish landed but no dashboard-dist was ever staged).
+    const currentDist = resolve(stateDir, "current", "dashboard-dist");
+    rmSync(currentDist, { recursive: true, force: true });
+
+    const second = runScript(["--no-pull"], env);
+    check("skip-self-heal: second exit 0", second.status === 0, second.stderr);
+    const secondLog = readFileSync(logPath, "utf8");
+    check(
+      "skip-self-heal: build re-invoked instead of skipping",
+      secondLog.length > firstLog.length,
+      `first=${firstLog.length} second=${secondLog.length}`,
+    );
+    check(
+      "skip-self-heal: second run does NOT report skipped",
+      !second.stdout.includes("skipped"),
+      second.stdout,
     );
   } finally {
     rmSync(work, { recursive: true, force: true });
