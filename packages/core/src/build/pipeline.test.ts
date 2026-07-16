@@ -820,6 +820,10 @@ describe("runFullBuild (orchestration)", () => {
           return c;
         },
         writeFileSync: (p: string, d: string) => { writes[p] = d; },
+        mkdirSync: vi.fn() as any,
+        rmSync: vi.fn() as any,
+        readdirSync: vi.fn(() => [{ name: "src" }]) as any,
+        symlinkSync: vi.fn() as any,
         execFileSync: execFileSync as any,
         resolveGitHash: () => "head456",
         createRegistry: async () => ({
@@ -1018,6 +1022,98 @@ describe("runFullBuild (orchestration)", () => {
     // Changed-file source is read from the repo (scanRoot), never the state tree.
     expect(reads).toContain("/repo/src/a.ts");
     expect(reads).not.toContain("/state/src/a.ts");
+  });
+
+  it("incremental regenerates stale checkpoint artifacts without falling back to full", async () => {
+    const { core, saved } = makeCore();
+    const getChangedFiles = vi.fn().mockReturnValue(["src/a.ts"]);
+    (core as any).getChangedFiles = getChangedFiles;
+    const fs: Record<string, string> = {
+      "/state/.understand-anything/knowledge-graph.json": JSON.stringify({
+        project: { gitCommitHash: "base123" },
+        nodes: [
+          { id: "src/a.ts", type: "file", filePath: "src/a.ts" },
+          { id: "src/b.ts", type: "file", filePath: "src/b.ts" },
+        ],
+        edges: [],
+      }),
+      "/state/.understand-anything/intermediate/scan-result.json": JSON.stringify({
+        files: [{ path: "src/a.ts", fileCategory: "code", language: "ts" }],
+        totalFiles: 1,
+      }),
+      "/state/.understand-anything/intermediate/batches.json": JSON.stringify({
+        batches: [
+          { batchIndex: 1, files: [{ path: "src/a.ts", fileCategory: "code", language: "ts" }] },
+          { batchIndex: 2, files: [{ path: "src/b.ts", fileCategory: "code", language: "ts" }] },
+        ],
+      }),
+      "/state/.understand-anything/intermediate/phase2-input-manifest.json": JSON.stringify({
+        batchesSha256: "skip",
+        batchCount: 1,
+      }),
+      "/repo/src/a.ts": "export const a = 1;\n",
+      "/repo/src/b.ts": "export const b = 2;\n",
+    };
+    const writes: Record<string, string> = {};
+    const execFileSync = vi.fn((_cmd: string, args: string[]) => {
+      const script = String(args[0] || "");
+      if (script.endsWith("scan-project.mjs")) {
+        writes[String(args[2])] = JSON.stringify({
+          files: [
+            { path: "src/a.ts", fileCategory: "code", language: "ts" },
+            { path: "src/b.ts", fileCategory: "code", language: "ts" },
+          ],
+          totalFiles: 2,
+        });
+      }
+      if (script.endsWith("compute-batches.mjs")) {
+        writes["/state/.understand-anything/intermediate/batches.json"] = JSON.stringify({
+          batches: [
+            { batchIndex: 1, files: [{ path: "src/a.ts", fileCategory: "code", language: "ts" }] },
+            { batchIndex: 2, files: [{ path: "src/b.ts", fileCategory: "code", language: "ts" }] },
+          ],
+        });
+      }
+    });
+
+    const result = await runBuildMode(
+      {
+        core,
+        skillDir: "/skill",
+        projectRoot: "/repo",
+        stateRoot: "/state",
+        mode: "incremental",
+        log: () => {},
+      },
+      {
+        existsSync: (p: string) => p in fs || p in writes,
+        readFileSync: (p: string) => {
+          const c = writes[p] ?? fs[p];
+          if (c === undefined) throw new Error(`missing ${p}`);
+          return c;
+        },
+        writeFileSync: (p: string, d: string) => { writes[p] = d; },
+        mkdirSync: vi.fn() as any,
+        rmSync: vi.fn() as any,
+        readdirSync: vi.fn(() => [{ name: "src" }]) as any,
+        symlinkSync: vi.fn() as any,
+        execFileSync: execFileSync as any,
+        resolveGitHash: () => "head456",
+        createRegistry: async () => ({
+          resolveImports: () => [],
+          analyzeFile: () => ({ functions: [], classes: [] }),
+          extractCallGraph: () => [],
+        }),
+      } as any,
+    );
+
+    const invokedScripts = execFileSync.mock.calls.map((call) => String(call[1]?.[0] || ""));
+    expect(invokedScripts.some((script) => script.endsWith("scan-project.mjs"))).toBe(true);
+    expect(invokedScripts.some((script) => script.endsWith("compute-batches.mjs"))).toBe(true);
+    expect(result.mode).toBe("incremental");
+    expect(result.updatedFiles).toEqual(["src/a.ts"]);
+    expect(saved.meta.m.gitCommitHash).toBe("head456");
+    expect(JSON.parse(writes["/state/.understand-anything/intermediate/phase2-input-manifest.json"]!).batchCount).toBe(1);
   });
 
   it("backfill auto-detects missing code files in an isolated workspace", async () => {

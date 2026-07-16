@@ -608,6 +608,88 @@ function createBackfillWorkspace(
   };
 }
 
+function isRecoverableIncrementalCheckpointError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /^build: resume (manifest not found|scan result not found|batches not found|scan-result hash mismatch|batches hash mismatch|batch count mismatch|batch artifact missing)/.test(message);
+}
+
+function regenerateIncrementalCheckpoint(
+  options: {
+    core: any;
+    skillDir: string;
+    projectRoot: string;
+    scanRoot: string;
+    paths: BuildPaths;
+    outputLanguage: string;
+    excludeTests: boolean;
+    gitHash: string;
+    registry: any;
+    log: BuildLog;
+  },
+  deps: BuildPipelineDeps,
+): void {
+  const read = deps.readFileSync ?? ((p: string, e: "utf8") => nodeReadFileSync(p, e));
+  const write = deps.writeFileSync ?? ((p: string, d: string, e: "utf8") => nodeWriteFileSync(p, d, e));
+  const execFileSync = deps.execFileSync ?? nodeExecFileSync;
+  const computeBatchesRoot = prepareComputeBatchesRoot(options.paths.stateRoot, options.scanRoot, options.paths.intermediateDir, {
+    mkdirSync: deps.mkdirSync,
+    rmSync: deps.rmSync,
+    readdirSync: deps.readdirSync,
+    symlinkSync: deps.symlinkSync,
+  });
+  let scan = runScanPhase(
+    {
+      skillDir: options.skillDir,
+      scanInputRoot: options.scanRoot,
+      scanPath: options.paths.scanPath,
+      excludeTests: options.excludeTests,
+      core: options.core,
+      log: options.log,
+    },
+    { execFileSync, readFileSync: read, writeFileSync: write },
+  );
+  scan = augmentScanResultWithImportMap(
+    {
+      registry: options.registry,
+      projectRoot: options.projectRoot,
+      analysisRoot: options.scanRoot,
+      scanPath: options.paths.scanPath,
+      scan,
+      log: options.log,
+    },
+    { readFileSync: read, writeFileSync: write },
+  );
+  try {
+    runBatchesPhase(
+      {
+        skillDir: options.skillDir,
+        computeRoot: computeBatchesRoot.root,
+        paths: options.paths,
+        projectRoot: options.projectRoot,
+        outputLanguage: options.outputLanguage,
+        excludeTests: options.excludeTests,
+        gitHash: options.gitHash,
+        buildKind: "incremental",
+        log: options.log,
+      },
+      { execFileSync, readFileSync: (p) => read(p, "utf8"), writeFileSync: write, currentGitDirty: deps.resolveGitDirty },
+    );
+  } finally {
+    computeBatchesRoot.cleanup();
+  }
+}
+
+function readCheckpointMetadata(
+  paths: BuildPaths,
+  read: (path: string, encoding: "utf8") => string,
+): ReturnType<typeof validatePhase2Checkpoint> {
+  const manifest = JSON.parse(read(paths.phase2ManifestPath, "utf8"));
+  const parsed = JSON.parse(read(paths.batchesPath, "utf8")) as { batches?: Array<{ batchIndex?: unknown }> };
+  const batches = Array.isArray(parsed.batches) ? parsed.batches : [];
+  const batchIndexes = batches.map((batch) => Number(batch.batchIndex)).filter((index): index is number => Number.isInteger(index));
+  return { manifest, batches, batchIndexes };
+}
+
 export async function runResumeBuild(
   options: RunBuildModeOptions,
   deps: BuildPipelineDeps = {},
@@ -856,16 +938,41 @@ export async function runPartialBuildUpdate(
   const analysisRoot = resolve(options.analysisRoot ?? stateRoot);
   const paths = resolveBuildPaths(analysisRoot);
 
-  const checkpoint = validateCheckpoint(paths, { existsSync, readFileSync: (p) => read(p, "utf8") });
   const affectedFiles = getIncrementalChangedFiles(core, projectRoot, existingGraph, statePaths.metaPath, { existsSync, readFileSync: read });
   if (affectedFiles.length === 0) {
     throw new Error(`build: ${mode} found no affected files; no build was run`);
   }
 
+  const gitHash = resolveGit(projectRoot);
+  let registry: any | null = null;
+  let checkpoint: ReturnType<typeof validatePhase2Checkpoint>;
+  try {
+    checkpoint = validateCheckpoint(paths, { existsSync, readFileSync: (p) => read(p, "utf8") });
+  } catch (error) {
+    if (!isRecoverableIncrementalCheckpointError(error)) throw error;
+    log(`incremental checkpoint stale; regenerating scan/batches (${(error as Error).message})`);
+    registry = await buildRegistry(core);
+    regenerateIncrementalCheckpoint(
+      {
+        core,
+        skillDir,
+        projectRoot,
+        scanRoot,
+        paths,
+        outputLanguage,
+        excludeTests,
+        gitHash,
+        registry,
+        log,
+      },
+      deps,
+    );
+    checkpoint = readCheckpointMetadata(paths, read);
+  }
+
   const selectedBatches = selectBatchesForFiles(checkpoint.batches, affectedFiles);
   if (selectedBatches.length === 0) {
     if (isDeletionOnlyUpdate(affectedFiles, projectRoot, existsSync)) {
-      const gitHash = resolveGit(projectRoot);
       const merged = mergeGraphPartialUpdate(existingGraph, { nodes: [], edges: [] }, affectedFiles);
       const validatedGraph = persistValidatedGraph(core, stateRoot, merged, gitHash, affectedFiles.length, outputLanguage, excludeTests);
       await writeEmbeddingsArtifact(stateRoot, validatedGraph, options.embedding, mkdir, write, log);
@@ -874,8 +981,6 @@ export async function runPartialBuildUpdate(
     throw new Error(`build: ${mode} could not map affected files to existing batches: ${affectedFiles.join(", ")}`);
   }
 
-  const gitHash = resolveGit(projectRoot);
-  const registry = await buildRegistry(core);
   const baseGraphCommit = String(existingGraph?.project?.gitCommitHash || readMetaGitCommitHash(statePaths.metaPath, { existsSync, readFileSync: read }) || "");
   const manifest = buildPhase2InputManifest({
     skillDir: options.skillDir,
@@ -891,6 +996,7 @@ export async function runPartialBuildUpdate(
     log,
   }, { readFileSync: (p) => read(p, "utf8"), currentGitDirty: deps.resolveGitDirty }, selectedBatches);
   write(paths.phase2ManifestPath, JSON.stringify(manifest, null, 2), "utf8");
+  if (!registry) registry = await buildRegistry(core);
   writeBatchGraphFiles(
     { core, registry, analysisRoot: scanRoot, intermediateDir: paths.intermediateDir, batches: selectedBatches, outputLanguage, projectName, gitHash, log },
     { readFileSync: read, writeFileSync: write },
