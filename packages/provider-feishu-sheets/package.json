@@ -1,6 +1,6 @@
 {
   "name": "@understand-anyway/provider-feishu-sheets",
-  "version": "0.0.1-next.10",
+  "version": "0.0.1",
   "description": "Optional Feishu (Lark) Sheets record sink implementing the RecordProvider contract over public Feishu endpoints. Generic, config-driven column layout.",
   "license": "MIT",
   "type": "module",
