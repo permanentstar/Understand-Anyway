@@ -8,6 +8,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { FeishuSheetsRecordProvider } from "../packages/provider-feishu-sheets/dist/index.js";
 
 const DEFAULT_NIGHTLY_WORKSHEET = "nightly-update";
@@ -88,6 +89,21 @@ function loadEnvFile() {
   }
 }
 
+/**
+ * Accept either a bare spreadsheet token or a Feishu Sheets URL and return the
+ * bare token. Recognized shapes:
+ *   - "shtxxxxxxxxxxxx"                                          -> as-is
+ *   - "https://<host>/sheets/<token>?sheet=<worksheet>"          -> <token>
+ *   - "https://<host>/sheets/<token>/"                            -> <token>
+ * Empty input throws — a missing sheet is a config bug worth failing loudly.
+ */
+export function extractSpreadsheetToken(input) {
+  const raw = String(input || "").trim();
+  if (!raw) throw new Error("missing Feishu spreadsheet token/url");
+  const match = raw.match(/\/sheets\/([^/?#]+)/);
+  return match ? match[1] : raw;
+}
+
 function buildNightlyEnvelope(aggregate) {
   return {
     kind: "nightly-update",
@@ -138,7 +154,7 @@ async function writeFeishu(args, aggregate) {
     appSecret: process.env.FEISHU_APP_SECRET || undefined,
     appSecretFile: process.env.FEISHU_APP_SECRET_FILE || undefined,
     appSecretEnv: process.env.FEISHU_APP_SECRET_ENV || "FEISHU_APP_SECRET",
-    spreadsheetToken: String(args.sheet || "").trim(),
+    spreadsheetToken: extractSpreadsheetToken(args.sheet),
     mappings: {
       "nightly-update": {
         worksheet: args.nightlyWorksheet,
@@ -211,9 +227,11 @@ async function main() {
   await writeFeishu(args, aggregate);
 }
 
-try {
-  await main();
-} catch (error) {
-  process.stderr.write(`${error?.message || String(error)}\n`);
-  process.exit(1);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    await main();
+  } catch (error) {
+    process.stderr.write(`${error?.message || String(error)}\n`);
+    process.exit(1);
+  }
 }
