@@ -7,18 +7,38 @@
 // - project-update
 
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { FeishuSheetsRecordProvider } from "../packages/provider-feishu-sheets/dist/index.js";
 
 const DEFAULT_NIGHTLY_WORKSHEET = "nightly-update";
 const DEFAULT_PROJECT_WORKSHEET = "project-update";
 
+async function loadFeishuSheetsRecordProvider() {
+  try {
+    const mod = await import("@understand-anyway/provider-feishu-sheets");
+    return mod.FeishuSheetsRecordProvider;
+  } catch {
+    const mod = await import(new URL("../packages/provider-feishu-sheets/dist/index.js", import.meta.url).href);
+    return mod.FeishuSheetsRecordProvider;
+  }
+}
+
+async function loadYamlParse() {
+  try {
+    const mod = await import("yaml");
+    return mod.parse;
+  } catch {
+    const mod = await import(new URL("../packages/cli/node_modules/yaml/dist/index.js", import.meta.url).href);
+    return mod.parse;
+  }
+}
+
 function parseArgs(argv) {
   const args = {
-    provider: process.env.UA_RECORD_PROVIDER || "none",
+    provider: "",
     input: "",
-    sheet: process.env.UA_RECORD_SHEET || process.env.UA_NIGHTLY_SHEET || process.env.UA_ANALYTICS_SHEET || "",
+    sheet: "",
+    config: process.env.UA_CONFIG || "",
     nightlyWorksheet: process.env.UA_RECORD_NIGHTLY_WORKSHEET || DEFAULT_NIGHTLY_WORKSHEET,
     projectWorksheet: process.env.UA_RECORD_PROJECT_WORKSHEET || DEFAULT_PROJECT_WORKSHEET,
   };
@@ -36,6 +56,11 @@ function parseArgs(argv) {
     }
     if (arg === "--sheet") {
       args.sheet = argv[i + 1] || args.sheet;
+      i += 1;
+      continue;
+    }
+    if (arg === "--config") {
+      args.config = argv[i + 1] || args.config;
       i += 1;
       continue;
     }
@@ -57,6 +82,7 @@ Options:
   --provider <name>            External record provider; default none
   --input <file>               Aggregate nightly result JSON
   --sheet <url|token>          External record spreadsheet URL or token
+  --config <deploy.yaml>       Deploy config path; default UA_CONFIG / project root
   --nightly-worksheet <name>   Run summary worksheet; default ${DEFAULT_NIGHTLY_WORKSHEET}
   --project-worksheet <name>   Project update worksheet; default ${DEFAULT_PROJECT_WORKSHEET}
 `,
@@ -69,10 +95,8 @@ Options:
   return args;
 }
 
-function loadEnvFile() {
-  const envPath = resolve(process.env.HOME || "", ".env");
-  if (!envPath || !existsSync(envPath)) return;
-  const content = readFileSync(envPath, "utf8");
+function parseEnvFile(content) {
+  const parsed = {};
   for (const rawLine of content.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line || line.startsWith("#")) continue;
@@ -80,13 +104,60 @@ function loadEnvFile() {
     const index = normalized.indexOf("=");
     if (index <= 0) continue;
     const key = normalized.slice(0, index).trim();
-    if (!key || process.env[key]) continue;
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
     let value = normalized.slice(index + 1).trim();
     if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);
     }
+    parsed[key] = value;
+  }
+  return parsed;
+}
+
+function loadEnvFile(envPath, { overwrite = false } = {}) {
+  if (!envPath || !existsSync(envPath)) return;
+  const parsed = parseEnvFile(readFileSync(envPath, "utf8"));
+  for (const [key, value] of Object.entries(parsed)) {
+    if (!overwrite && process.env[key]) continue;
     process.env[key] = value;
   }
+}
+
+function findDeployConfigPath(args) {
+  const candidates = [
+    args.config,
+    process.env.UA_CONFIG,
+    process.env.UA_PROJECTS_ROOT ? resolve(process.env.UA_PROJECTS_ROOT, "gateway", "config", "deploy.yaml") : "",
+    process.env.HOME ? resolve(process.env.HOME, "understand-projects", "gateway", "config", "deploy.yaml") : "",
+  ].filter(Boolean);
+  return candidates.find((candidate) => existsSync(candidate)) || "";
+}
+
+function resolveTemplateString(value) {
+  return value.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_match, expr) => {
+    const fileMatch = String(expr).match(/^file\(['"](.+)['"]\)$/);
+    if (fileMatch) return readFileSync(fileMatch[1], "utf8").trim();
+    return process.env[String(expr).trim()] ?? "";
+  });
+}
+
+function resolveTemplates(value) {
+  if (typeof value === "string") return resolveTemplateString(value);
+  if (Array.isArray(value)) return value.map(resolveTemplates);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, resolveTemplates(item)]));
+  }
+  return value;
+}
+
+async function loadFeishuRecordConfig(configPath) {
+  if (!configPath || !existsSync(configPath)) return null;
+  const parse = await loadYamlParse();
+  const config = resolveTemplates(parse(readFileSync(configPath, "utf8")) ?? {});
+  const record = config.record ?? {};
+  const providers = Array.isArray(record.providers) ? record.providers.map(String) : [];
+  if (providers.length > 0 && !providers.includes("feishu-sheets")) return null;
+  return record.config?.["feishu-sheets"] ?? null;
 }
 
 /**
@@ -104,7 +175,41 @@ export function extractSpreadsheetToken(input) {
   return match ? match[1] : raw;
 }
 
-function buildNightlyEnvelope(aggregate) {
+export const NIGHTLY_COLUMNS = [
+  "runId",
+  "startedAt",
+  "finishedAt",
+  "overallStatus",
+  "projectCount",
+  "successCount",
+  "failedCount",
+  "buildSuccessCount",
+  "resultJson",
+];
+
+export const PROJECT_COLUMNS = [
+  "runId",
+  "startedAt",
+  "finishedAt",
+  "projectName",
+  "repoPath",
+  "stateDir",
+  "overallStatus",
+  "build.status",
+  "gate.status",
+  "gate.approved",
+  "failureReason",
+  "needsManualIntervention",
+  "git.commitBefore",
+  "git.commitAfter",
+  "llm.provider",
+  "logs.result",
+  "logs.build",
+  "gate.jsonPath",
+  "gate.logPath",
+];
+
+export function buildNightlyEnvelope(aggregate) {
   return {
     kind: "nightly-update",
     timestamp: aggregate.finishedAt || new Date().toISOString(),
@@ -145,55 +250,48 @@ function buildProjectEnvelopes(aggregate) {
   }));
 }
 
-async function writeFeishu(args, aggregate) {
-  loadEnvFile();
-  const appId = process.env.FEISHU_APP_ID || "";
-  if (!appId) throw new Error("missing FEISHU_APP_ID; put it in ~/.env");
+export { buildProjectEnvelopes };
+
+function mappingFor(recordConfig, kind, fallbackWorksheet, fallbackColumns) {
+  const configured = recordConfig?.mappings?.[kind];
+  return {
+    worksheet: String(configured?.worksheet || fallbackWorksheet),
+    columns: Array.isArray(configured?.columns) && configured.columns.length > 0
+      ? configured.columns.map(String)
+      : fallbackColumns,
+  };
+}
+
+export async function resolveRuntime(args) {
+  loadEnvFile(resolve(process.env.HOME || "", ".env"), { overwrite: false });
+  const configPath = findDeployConfigPath(args);
+  if (configPath) {
+    loadEnvFile(resolve(dirname(configPath), ".env"), { overwrite: true });
+  }
+  const recordConfig = await loadFeishuRecordConfig(configPath);
+  const provider = args.provider || (recordConfig ? "feishu" : process.env.UA_RECORD_PROVIDER) || "none";
+  const sheet = args.sheet
+    || recordConfig?.spreadsheetToken
+    || process.env.UA_RECORD_SHEET
+    || process.env.UA_NIGHTLY_SHEET
+    || process.env.UA_ANALYTICS_SHEET
+    || "";
+  return { configPath, recordConfig, provider, sheet };
+}
+
+async function writeFeishu(args, runtime, aggregate) {
+  const appId = runtime.recordConfig?.appId || process.env.FEISHU_APP_ID || process.env.LARK_APP_ID || "";
+  if (!appId) throw new Error("missing Feishu app id; set record.config.feishu-sheets.appId or FEISHU_APP_ID/LARK_APP_ID");
+  const FeishuSheetsRecordProvider = await loadFeishuSheetsRecordProvider();
   const provider = new FeishuSheetsRecordProvider({
     appId,
-    appSecret: process.env.FEISHU_APP_SECRET || undefined,
-    appSecretFile: process.env.FEISHU_APP_SECRET_FILE || undefined,
-    appSecretEnv: process.env.FEISHU_APP_SECRET_ENV || "FEISHU_APP_SECRET",
-    spreadsheetToken: extractSpreadsheetToken(args.sheet),
+    appSecret: runtime.recordConfig?.appSecret || process.env.FEISHU_APP_SECRET || process.env.LARK_APP_SECRET || undefined,
+    appSecretFile: runtime.recordConfig?.appSecretFile || process.env.FEISHU_APP_SECRET_FILE || undefined,
+    appSecretEnv: runtime.recordConfig?.appSecretEnv || process.env.FEISHU_APP_SECRET_ENV || "FEISHU_APP_SECRET",
+    spreadsheetToken: extractSpreadsheetToken(runtime.sheet),
     mappings: {
-      "nightly-update": {
-        worksheet: args.nightlyWorksheet,
-        columns: [
-          "runId",
-          "startedAt",
-          "finishedAt",
-          "overallStatus",
-          "projectCount",
-          "successCount",
-          "failedCount",
-          "buildSuccessCount",
-          "resultJson",
-        ],
-      },
-      "project-update": {
-        worksheet: args.projectWorksheet,
-        columns: [
-          "runId",
-          "startedAt",
-          "finishedAt",
-          "projectName",
-          "repoPath",
-          "stateDir",
-          "overallStatus",
-          "build.status",
-          "gate.status",
-          "gate.approved",
-          "failureReason",
-          "needsManualIntervention",
-          "git.commitBefore",
-          "git.commitAfter",
-          "llm.providerName",
-          "logs.result",
-          "logs.build",
-          "gate.jsonPath",
-          "gate.logPath",
-        ],
-      },
+      "nightly-update": mappingFor(runtime.recordConfig, "nightly-update", args.nightlyWorksheet, NIGHTLY_COLUMNS),
+      "project-update": mappingFor(runtime.recordConfig, "project-update", args.projectWorksheet, PROJECT_COLUMNS),
     },
     log: (message) => process.stderr.write(`${message}\n`),
   });
@@ -203,7 +301,7 @@ async function writeFeishu(args, aggregate) {
     await provider.write(envelope);
   }
   process.stdout.write(
-    `[write-external-records] provider=feishu sheet=${args.sheet} nightly=${args.nightlyWorksheet} project=${args.projectWorksheet}\n`,
+    `[write-external-records] provider=feishu sheet=${runtime.sheet} nightly=${args.nightlyWorksheet} project=${args.projectWorksheet}\n`,
   );
 }
 
@@ -213,18 +311,19 @@ async function main() {
     throw new Error(`missing aggregate result: ${args.input}`);
   }
   const aggregate = JSON.parse(readFileSync(args.input, "utf8"));
+  const runtime = await resolveRuntime(args);
 
-  if (args.provider === "none" || !args.provider) {
+  if (runtime.provider === "none" || !runtime.provider) {
     process.stdout.write("[write-external-records] provider=none skipped\n");
     return;
   }
-  if (args.provider !== "feishu") {
-    throw new Error(`unsupported record provider: ${args.provider}`);
+  if (runtime.provider !== "feishu") {
+    throw new Error(`unsupported record provider: ${runtime.provider}`);
   }
-  if (!args.sheet) {
-    throw new Error("missing Feishu spreadsheet token/url (--sheet)");
+  if (!runtime.sheet) {
+    throw new Error("missing Feishu spreadsheet token/url (--sheet or record.config.feishu-sheets.spreadsheetToken)");
   }
-  await writeFeishu(args, aggregate);
+  await writeFeishu(args, runtime, aggregate);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -39,6 +39,7 @@ try {
     "refresh-prod-server.sh",
     "aggregate-daily.mjs",
     "aggregate-nightly.mjs",
+    "write-external-records.mjs",
     "lib/common.sh",
     "lib/discover-projects.mjs",
     "lib/upsert-project-registry.mjs",
@@ -51,7 +52,6 @@ try {
     "lib/release-gate-helpers.mjs",
     "lib/__tests__",
     "lib/__tests__/discover-projects.test.mjs",
-    "write-external-records.mjs",
   ];
   for (const f of mustNotExist) {
     assert.ok(!existsSync(resolve(dest, f)), `should not bundle ${f}`);

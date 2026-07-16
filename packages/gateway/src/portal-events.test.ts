@@ -61,4 +61,34 @@ describe("buildUserEventPayload", () => {
     const env = buildUserEventPayload(null, fakeReq({}, "203.0.113.9"), { eventType: "project_view" });
     expect(env.payload.sourceIp).toBe("203.0.113.9");
   });
+
+  it("payload exposes the full set of stable top-level keys downstream sinks depend on", () => {
+    // Sinks (deploy.yaml columns, external-record scripts) index into payload by
+    // literal key names. If someone renames a field here without updating the
+    // sink, rows silently land as blanks. This locks the contract.
+    const env = buildUserEventPayload(
+      session({ id: "u1", email: "a@b.c", displayName: "Alice", raw: { open_id: "ou_x" } }),
+      fakeReq({ "user-agent": "UA/1.0" }),
+      { eventType: "project_view", targetType: "project", targetId: "demo", targetName: "Demo", targetUrl: "/project/demo/" },
+    );
+    const expected = [
+      "eventId",
+      "eventTime",
+      "eventType",
+      "userId",
+      "email",
+      "displayName",
+      "sourceIp",
+      "userAgent",
+      "targetType",
+      "targetId",
+      "targetName",
+      "targetUrl",
+      "extra",
+      "raw",
+    ];
+    for (const key of expected) {
+      expect(env.payload).toHaveProperty(key);
+    }
+  });
 });

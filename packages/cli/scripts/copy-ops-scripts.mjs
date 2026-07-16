@@ -15,6 +15,7 @@ const FILES = [
   "refresh-prod-server.sh",
   "aggregate-daily.mjs",
   "aggregate-nightly.mjs",
+  "write-external-records.mjs",
   "lib/common.sh",
   "lib/discover-projects.mjs",
   "lib/upsert-project-registry.mjs",
