@@ -142,7 +142,7 @@ export interface DashboardStartCliArgs extends DashboardCommonArgs {
 export interface DashboardBuildDistCliArgs extends DashboardCommonArgs {
   action: "build-dist";
   projectId: string;
-  pluginRoot: string;
+  pluginRoot: string | null;
   rebuildDashboard: boolean;
 }
 
@@ -491,9 +491,10 @@ dashboard subcommands:
                              when dashboard-dist/ must be patched + built
       --rebuild-dashboard    Force-rebuild dashboard-dist/ even if it exists
 
-    dashboard build-dist --project <id> --plugin-root <dir> [--rebuild-dashboard]
+    dashboard build-dist --project <id> [--plugin-root <dir>] [--rebuild-dashboard]
                          Build or refresh <stateRoot>/dashboard-dist without
-                         starting a daemon.
+                         starting a daemon. Upstream plugin auto-resolves when
+                         --plugin-root is omitted.
 
   dashboard stop --project <id>
                         Send SIGTERM, wait grace period, then SIGKILL if needed.
@@ -938,7 +939,6 @@ function parseDashboardArgs(rest: string[]): ParsedArgs {
   }
   if (action === "build-dist") {
     if (!projectId) throw new ArgsError("dashboard build-dist: missing required --project <id>");
-    if (!pluginRoot) throw new ArgsError("dashboard build-dist: missing required --plugin-root");
     return {
       command: "dashboard",
       action: "build-dist",

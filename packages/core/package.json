@@ -1,6 +1,6 @@
 {
   "name": "@understand-anyway/core",
-  "version": "0.0.1-next.3",
+  "version": "0.0.1-next.4",
   "description": "Multi-project orchestration pipeline for Understand-Anyway (scan/batch/merge orchestration over upstream Understand-Anything).",
   "license": "MIT",
   "type": "module",

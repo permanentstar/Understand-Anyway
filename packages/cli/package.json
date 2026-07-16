@@ -1,6 +1,6 @@
 {
   "name": "@understand-anyway/cli",
-  "version": "0.0.1-next.3",
+  "version": "0.0.1-next.4",
   "description": "CLI entry for Understand-Anyway: build, dashboard, prod, incremental, scheduling.",
   "license": "MIT",
   "type": "module",

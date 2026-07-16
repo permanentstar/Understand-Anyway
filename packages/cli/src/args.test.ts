@@ -499,9 +499,15 @@ describe("parseArgs — dashboard subcommand (D2)", () => {
         .toThrow(/missing required --project/);
     });
 
-    it("rejects build-dist when --plugin-root is missing", () => {
-      expect(() => parseArgs(["dashboard", "build-dist", "--project", "alpha"]))
-        .toThrow(/missing required --plugin-root/);
+    it("accepts build-dist without --plugin-root (auto-resolves upstream)", () => {
+      const parsed = parseArgs(["dashboard", "build-dist", "--project", "alpha"]);
+      expect(parsed.command).toBe("dashboard");
+      if (parsed.command === "dashboard" && parsed.action === "build-dist") {
+        expect(parsed.projectId).toBe("alpha");
+        expect(parsed.pluginRoot).toBeNull();
+      } else {
+        throw new Error("expected dashboard build-dist parse");
+      }
     });
 
     it("rejects an out-of-range port", () => {
