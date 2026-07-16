@@ -13,9 +13,10 @@ function args(overrides: Partial<BuildArgs> = {}): BuildArgs {
     mode: "full",
     includePaths: [],
     config: null,
-    profile: null,
+    deployProfile: null,
     llmAnalysis: null,
     llmProvider: null,
+    llmProfile: null,
     embeddingProvider: null,
     llmRequired: null,
     llmModelCandidates: [],
@@ -63,10 +64,10 @@ describe("resolveBuildConfig", () => {
     });
   });
 
-  it("uses profile build defaults for stable template parameters", () => {
-    const resolved = resolveBuildConfig(args({ profile: "nightly" }), {
-      profiles: {
-        nightly: {
+  it("uses deploy profile build defaults for stable template parameters", () => {
+    const resolved = resolveBuildConfig(args({ deployProfile: "prod" }), {
+      deployProfiles: {
+        prod: {
           build: {
             mode: "incremental",
             outputLanguage: "zh",
@@ -80,9 +81,47 @@ describe("resolveBuildConfig", () => {
     expect(resolved.excludeTests).toBe(true);
   });
 
+  it("uses deploy profile build defaults for deployment specs", () => {
+    const resolved = resolveBuildConfig(args({ deployProfile: "ppe" }), {
+      deployProfiles: {
+        ppe: {
+          build: {
+            mode: "full",
+            outputLanguage: "zh",
+            excludeTests: true,
+            llmAnalysis: true,
+            llmRequired: false,
+            llmModelCandidates: ["small"],
+          },
+        },
+        prod: {
+          build: {
+            mode: "incremental",
+            outputLanguage: "zh",
+            excludeTests: true,
+            llmAnalysis: true,
+            llmRequired: true,
+            llmModelCandidates: ["large"],
+          },
+        },
+      },
+    });
+    expect(resolved.mode).toBe("full");
+    expect(resolved.outputLanguage).toBe("zh");
+    expect(resolved.llmAnalysis).toBe(true);
+    expect(resolved.llmRequired).toBe(false);
+    expect(resolved.llmModelCandidates).toEqual(["small"]);
+  });
+
+  it("throws for an unknown deploy profile", () => {
+    expect(() => resolveBuildConfig(args({ deployProfile: "missing" }), { deployProfiles: {} })).toThrow(
+      /unknown --deploy-profile/,
+    );
+  });
+
   it("lets YAML include test files when CLI does not set the test filter", () => {
-    const resolved = resolveBuildConfig(args({ profile: "with-tests" }), {
-      profiles: {
+    const resolved = resolveBuildConfig(args({ deployProfile: "with-tests" }), {
+      deployProfiles: {
         "with-tests": {
           build: {
             excludeTests: false,
@@ -93,17 +132,17 @@ describe("resolveBuildConfig", () => {
     expect(resolved.excludeTests).toBe(false);
   });
 
-  it("lets CLI intent and include paths override profile intent", () => {
-    const resolved = resolveBuildConfig(args({ mode: "backfill", includePaths: ["src/a.ts"], profile: "nightly" }), {
-      profiles: { nightly: { build: { mode: "incremental" } } },
+  it("lets CLI intent and include paths override deploy profile intent", () => {
+    const resolved = resolveBuildConfig(args({ mode: "backfill", includePaths: ["src/a.ts"], deployProfile: "prod" }), {
+      deployProfiles: { prod: { build: { mode: "incremental" } } },
     });
     expect(resolved.mode).toBe("backfill");
     expect(resolved.includePaths).toEqual(["src/a.ts"]);
   });
 
-  it("lets UA_BUILD_MODE_OVERRIDE force a full bootstrap over profile incremental defaults", () => {
-    const resolved = resolveBuildConfig(args({ profile: "nightly" }), {
-      profiles: { nightly: { build: { mode: "incremental" } } },
+  it("lets UA_BUILD_MODE_OVERRIDE force a full bootstrap over deploy profile incremental defaults", () => {
+    const resolved = resolveBuildConfig(args({ deployProfile: "prod" }), {
+      deployProfiles: { prod: { build: { mode: "incremental" } } },
     }, {
       env: { UA_BUILD_MODE_OVERRIDE: "full" },
     });
@@ -111,20 +150,16 @@ describe("resolveBuildConfig", () => {
   });
 
   it("does not read occasional include targets from deploy YAML", () => {
-    const resolved = resolveBuildConfig(args({ profile: "repair" }), {
-      profiles: { repair: { build: { mode: "backfill" }, include: ["src/a.ts"] } },
+    const resolved = resolveBuildConfig(args({ deployProfile: "repair" }), {
+      deployProfiles: { repair: { build: { mode: "backfill" }, include: ["src/a.ts"] } },
     });
     expect(resolved.mode).toBe("backfill");
     expect(resolved.includePaths).toEqual([]);
   });
 
-  it("throws when the selected profile does not exist", () => {
-    expect(() => resolveBuildConfig(args({ profile: "missing" }), { profiles: {} })).toThrow(/unknown --profile/);
-  });
-
-  it("resolves llm flags from profile build defaults", () => {
-    const resolved = resolveBuildConfig(args({ profile: "llm-nightly" }), {
-      profiles: { "llm-nightly": { build: { llmAnalysis: true, llmRequired: false, llmModelCandidates: ["small", "large"] } } },
+  it("resolves llm flags from deploy profile build defaults", () => {
+    const resolved = resolveBuildConfig(args({ deployProfile: "llm-nightly" }), {
+      deployProfiles: { "llm-nightly": { build: { llmAnalysis: true, llmRequired: false, llmModelCandidates: ["small", "large"] } } },
     });
     expect(resolved.llmAnalysis).toBe(true);
     expect(resolved.llmRequired).toBe(false);
@@ -144,10 +179,10 @@ describe("resolveBuildConfig", () => {
     expect(resolved.llmRetryPolicy).toEqual(DEFAULT_RETRY_POLICY);
   });
 
-  it("reads llmRetry from profile build defaults", () => {
-    const resolved = resolveBuildConfig(args({ profile: "nightly" }), {
-      profiles: {
-        nightly: {
+  it("reads llmRetry from deploy profile build defaults", () => {
+    const resolved = resolveBuildConfig(args({ deployProfile: "prod" }), {
+      deployProfiles: {
+        prod: {
           build: {
             llmRetry: {
               maxAttempts: 4,
@@ -169,15 +204,15 @@ describe("resolveBuildConfig", () => {
     });
   });
 
-  it("UA_LLM_RETRY_* env overrides YAML profile but loses to CLI flags", () => {
+  it("UA_LLM_RETRY_* env overrides YAML deploy profile but loses to CLI flags", () => {
     const resolved = resolveBuildConfig(
       args({
-        profile: "nightly",
+        deployProfile: "prod",
         llmRetry: { maxAttempts: 7, initialBackoffMs: null, maxBackoffMs: null },
       }),
       {
-        profiles: {
-          nightly: { build: { llmRetry: { maxAttempts: 5, initialBackoffMs: 100, maxBackoffMs: 200 } } },
+        deployProfiles: {
+          prod: { build: { llmRetry: { maxAttempts: 5, initialBackoffMs: 100, maxBackoffMs: 200 } } },
         },
       },
       {
@@ -189,19 +224,19 @@ describe("resolveBuildConfig", () => {
       },
     );
     expect(resolved.llmRetryPolicy.maxAttempts).toBe(7); // CLI wins
-    expect(resolved.llmRetryPolicy.initialBackoffMs).toBe(300); // env > profile
-    expect(resolved.llmRetryPolicy.maxBackoffMs).toBe(400); // env > profile
+    expect(resolved.llmRetryPolicy.initialBackoffMs).toBe(300); // env > deploy profile
+    expect(resolved.llmRetryPolicy.maxBackoffMs).toBe(400); // env > deploy profile
   });
 
   it("rejects invalid llmRetry YAML values", () => {
     expect(() =>
-      resolveBuildConfig(args({ profile: "bad" }), {
-        profiles: { bad: { build: { llmRetry: { maxAttempts: 0 } } } },
+      resolveBuildConfig(args({ deployProfile: "bad" }), {
+        deployProfiles: { bad: { build: { llmRetry: { maxAttempts: 0 } } } },
       }, { env: {} }),
     ).toThrow(/llmRetry.maxAttempts/);
     expect(() =>
-      resolveBuildConfig(args({ profile: "bad" }), {
-        profiles: { bad: { build: { llmRetry: { jitterRatio: 1.5 } } } },
+      resolveBuildConfig(args({ deployProfile: "bad" }), {
+        deployProfiles: { bad: { build: { llmRetry: { jitterRatio: 1.5 } } } },
       }, { env: {} }),
     ).toThrow(/llmRetry.jitterRatio/);
   });
@@ -229,9 +264,9 @@ describe("resolveBuildConfig", () => {
 
   it("CLI batch-mode tuning overrides config and host defaults", () => {
     const resolved = resolveBuildConfig(
-      args({ batchMode: "segmented", mapperBatchCount: 7, mapperConcurrency: 3 }),
+      args({ deployProfile: "prod", batchMode: "segmented", mapperBatchCount: 7, mapperConcurrency: 3 }),
       {
-        profiles: { nightly: { build: { batchMode: "full", mapperBatchCount: 20, mapperConcurrency: 2 } } },
+        deployProfiles: { prod: { build: { batchMode: "full", mapperBatchCount: 20, mapperConcurrency: 2 } } },
       },
       { env: {}, ...bigHostDeps },
     );
@@ -242,9 +277,9 @@ describe("resolveBuildConfig", () => {
 
   it("UA_MAPPER_* env overrides YAML but loses to CLI flags", () => {
     const resolved = resolveBuildConfig(
-      args({ profile: "nightly", mapperBatchCount: 9, mapperConcurrency: null }),
+      args({ deployProfile: "prod", mapperBatchCount: 9, mapperConcurrency: null }),
       {
-        profiles: { nightly: { build: { mapperBatchCount: 25, mapperConcurrency: 2 } } },
+        deployProfiles: { prod: { build: { mapperBatchCount: 25, mapperConcurrency: 2 } } },
       },
       {
         env: { UA_MAPPER_BATCH_COUNT: "11", UA_MAPPER_CONCURRENCY: "5" },
@@ -255,9 +290,9 @@ describe("resolveBuildConfig", () => {
     expect(resolved.mapperConcurrency).toBe(5); // env > YAML
   });
 
-  it("YAML profile batchMode/mapper sizes are picked up when CLI is unset", () => {
-    const resolved = resolveBuildConfig(args({ profile: "nightly" }), {
-      profiles: { nightly: { build: { batchMode: "segmented", mapperBatchCount: 16, mapperConcurrency: 2 } } },
+  it("YAML deploy profile batchMode/mapper sizes are picked up when CLI is unset", () => {
+    const resolved = resolveBuildConfig(args({ deployProfile: "prod" }), {
+      deployProfiles: { prod: { build: { batchMode: "segmented", mapperBatchCount: 16, mapperConcurrency: 2 } } },
     }, { env: {}, ...tinyHostDeps });
     expect(resolved.batchMode).toBe("segmented");
     expect(resolved.mapperBatchCount).toBe(16);
@@ -266,13 +301,13 @@ describe("resolveBuildConfig", () => {
 
   it("rejects invalid mapper YAML values", () => {
     expect(() =>
-      resolveBuildConfig(args({ profile: "bad" }), {
-        profiles: { bad: { build: { mapperBatchCount: 0 } } },
+      resolveBuildConfig(args({ deployProfile: "bad" }), {
+        deployProfiles: { bad: { build: { mapperBatchCount: 0 } } },
       }, { env: {}, ...tinyHostDeps }),
     ).toThrow(/mapperBatchCount/);
     expect(() =>
-      resolveBuildConfig(args({ profile: "bad" }), {
-        profiles: { bad: { build: { batchMode: "turbo" as unknown as "auto" } } },
+      resolveBuildConfig(args({ deployProfile: "bad" }), {
+        deployProfiles: { bad: { build: { batchMode: "turbo" as unknown as "auto" } } },
       }, { env: {}, ...tinyHostDeps }),
     ).toThrow(/batchMode/);
   });

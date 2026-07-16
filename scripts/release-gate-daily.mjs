@@ -21,11 +21,11 @@ async function main() {
     };
     const dailyScript = resolve(process.cwd(), "scripts", "daily-update.sh");
 
-    run("bash", [dailyScript, "--project", projectId, "--profile", "small", "--no-self-update", "--no-pull", "--host", "127.0.0.1", "--port", "18666"], { cwd: process.cwd(), env });
+    run("bash", [dailyScript, "--project", projectId, "--deploy-profile", "ppe", "--no-self-update", "--no-pull", "--host", "127.0.0.1", "--port", "18666"], { cwd: process.cwd(), env });
     let latest = readJson(resolve(projectsRoot, "projects", projectId, ".understand-anything", "nightly-latest.json"));
     assert(latest.overallStatus === "success", "first daily run should succeed");
 
-    run("bash", [dailyScript, "--project", projectId, "--profile", "small", "--no-self-update", "--no-pull", "--host", "127.0.0.1", "--port", "18666"], { cwd: process.cwd(), env });
+    run("bash", [dailyScript, "--project", projectId, "--deploy-profile", "ppe", "--no-self-update", "--no-pull", "--host", "127.0.0.1", "--port", "18666"], { cwd: process.cwd(), env });
     latest = readJson(resolve(projectsRoot, "projects", projectId, ".understand-anything", "nightly-latest.json"));
     assert(latest.build?.status === "skipped", "second daily run should skip build when commit is unchanged");
 

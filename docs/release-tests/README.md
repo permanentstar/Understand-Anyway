@@ -43,7 +43,7 @@ pnpm run delivery:local --keep-running
 ```
 
 退出码：0=全通过；1=用例失败；2=前置不满足（缺 `UA_PLUGIN_ROOT` / Node<20 / 缺 `pnpm` / `--profile real-llm` 缺 `llm`）。
-脚本自身覆盖三层：(1) repo 构建 + 直接跑 + portal/项目路由 HTTP 断言；(2) Verdaccio 发 6 包 + 干净目录安装 + 复跑核心 CLI；(3) 多项目共享 gateway + LLM 富化产物断言（mock 或 cli-spawn）+ token 隔离 + 翻新 gateway 回归。本目录下的 runbook 仅在脚本失败、需要人工排查、或验收方要人眼复核 UI 时使用。
+脚本自身覆盖三层：(1) repo 构建 + 直接跑 + portal/项目路由 HTTP 断言；(2) Verdaccio 发 10 包 + 干净目录安装 + 复跑核心 CLI；(3) 多项目共享 gateway + LLM 富化产物断言（mock 或 `@understand-anyway/provider-trae-cli-v2`）+ token 隔离 + 翻新 gateway 回归。本目录下的 runbook 仅在脚本失败、需要人工排查、或验收方要人眼复核 UI 时使用。
 
 ## 本地测试结构
 
@@ -78,7 +78,7 @@ docs/release-tests/
 | 7 | external | PPE repo-checkout | 真实外部部署 | `pnpm run release:gate -- --external ppe-repo` | 按需 | — |
 | 8 | external | PPE npm-installed | 安装态真实部署 | `pnpm run release:gate -- --external ppe-npm-installed` | 按需 | — |
 | 9 | external | PPE ops/versioning | 外部环境运维命令 | `pnpm run release:gate -- --external ppe-ops` | 按需 | — |
-| 10 | external | PPE real LLM | coco / cli-spawn | `pnpm run release:gate -- --external ppe-real-llm` | 按需 | — |
+| 10 | external | PPE real LLM | trae-cli-v2 / traex | `pnpm run release:gate -- --external ppe-real-llm` | 按需 | — |
 
 ## 用例链接
 

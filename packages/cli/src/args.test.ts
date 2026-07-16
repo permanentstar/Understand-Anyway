@@ -209,9 +209,10 @@ describe("parseArgs build", () => {
       mode: "full",
       includePaths: [],
       config: null,
-      profile: null,
+      deployProfile: null,
       llmAnalysis: null,
       llmProvider: null,
+      llmProfile: null,
       embeddingProvider: null,
       llmRequired: null,
       llmModelCandidates: [],
@@ -262,11 +263,29 @@ describe("parseArgs build", () => {
     });
   });
 
-  it("parses build config and profile flags", () => {
-    const parsed = parseArgs(["build", "--config", "/cfg/deploy.yaml", "--profile", "nightly", "--project", "alpha"]);
+  it("parses build config flag", () => {
+    const parsed = parseArgs(["build", "--config", "/cfg/deploy.yaml", "--project", "alpha"]);
     if (parsed.command !== "build") throw new Error("expected build");
     expect(parsed.config).toBe("/cfg/deploy.yaml");
-    expect(parsed.profile).toBe("nightly");
+  });
+
+  it("rejects the removed build --profile flag", () => {
+    expect(() => parseArgs(["build", "--config", "/cfg/deploy.yaml", "--profile", "nightly", "--project", "alpha"]))
+      .toThrow(/unknown option: --profile/);
+  });
+
+  it("parses deploy and llm profile flags for build", () => {
+    const parsed = parseArgs([
+      "build",
+      "--config", "/cfg/deploy.yaml",
+      "--deploy-profile", "ppe",
+      "--llm-profile", "traex",
+      "--project", "alpha",
+    ]);
+    if (parsed.command !== "build") throw new Error("expected build");
+    expect(parsed.config).toBe("/cfg/deploy.yaml");
+    expect(parsed.deployProfile).toBe("ppe");
+    expect(parsed.llmProfile).toBe("traex");
   });
 
   it("parses llm build flags", () => {

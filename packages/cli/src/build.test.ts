@@ -16,9 +16,10 @@ function baseArgs(overrides: Partial<BuildArgs> = {}): BuildArgs {
     mode: "full",
     includePaths: [],
     config: null,
-    profile: null,
+    deployProfile: null,
     llmAnalysis: null,
     llmProvider: null,
+    llmProfile: null,
     embeddingProvider: null,
     llmRequired: null,
     llmModelCandidates: [],
@@ -156,7 +157,7 @@ describe("runBuild", () => {
     expect(bootstrap).not.toHaveBeenCalled();
   });
 
-  it("loads build config/profile and calls runBuildMode", async () => {
+  it("loads build deploy profile and calls runBuildMode", async () => {
     const bootstrap = vi.fn().mockResolvedValue({ pluginRoot: "/p", skillDir: "/p/s", core: {} });
     const runBuildPipeline = vi.fn().mockResolvedValue({
       mode: "incremental",
@@ -166,12 +167,12 @@ describe("runBuild", () => {
       paths: { stateRoot: repo },
     });
 
-    await runBuild(baseArgs({ mode: "incremental", profile: "nightly" }), {
+    await runBuild(baseArgs({ mode: "incremental", deployProfile: "prod" }), {
       log: () => {},
       deps: {
         bootstrap,
         runBuild: runBuildPipeline,
-        loadConfig: () => ({ profiles: { nightly: { build: { outputLanguage: "zh" } } } }),
+        loadConfig: () => ({ deployProfiles: { prod: { build: { outputLanguage: "zh" } } } }),
         resolveProjectContext: () => fakeCtx(repo, repo),
       },
     });
@@ -397,5 +398,48 @@ describe("runBuild", () => {
     });
 
     expect(buildLlm.mock.calls[0]![0].packageName).toBe("cli-pkg");
+  });
+
+  it("loads llm provider from --llm-profile and passes profile config", async () => {
+    const bootstrap = vi.fn().mockResolvedValue({ pluginRoot: "/p", skillDir: "/p/s", core: {} });
+    const runBuildPipeline = vi.fn().mockResolvedValue({
+      graph: { nodes: [], edges: [] },
+      gitHash: "abc",
+      analyzedFiles: 0,
+      paths: { stateRoot: repo },
+    });
+    const assertLlmContract = vi.fn();
+    const buildLlm = vi.fn().mockResolvedValue({ name: "fake-llm", complete: vi.fn() });
+
+    await runBuild(baseArgs({ llmAnalysis: true, llmProfile: "traex" }), {
+      log: () => {},
+      deps: {
+        bootstrap,
+        assertLlmContract,
+        runBuild: runBuildPipeline,
+        loadConfig: () => ({
+          llmProfiles: {
+            traex: {
+              package: "@understand-anyway/provider-trae-cli-v2",
+              config: { command: "traex", modelArg: "-m" },
+            },
+          },
+        }),
+        buildLlmProvider: buildLlm,
+        resolveProjectContext: () => fakeCtx(repo, repo),
+      },
+    });
+
+    expect(buildLlm.mock.calls[0]![0]).toMatchObject({
+      packageName: "@understand-anyway/provider-trae-cli-v2",
+      config: {
+        providers: {
+          llm: {
+            package: "@understand-anyway/provider-trae-cli-v2",
+            config: { command: "traex", modelArg: "-m" },
+          },
+        },
+      },
+    });
   });
 });

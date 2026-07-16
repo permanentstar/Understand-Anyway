@@ -1,8 +1,8 @@
 /**
- * Build config/profile resolution.
+ * Build config/deploy-profile resolution.
  *
  * This keeps the public CLI template-oriented while still allowing stable build
- * defaults in deploy.yaml profiles. Per-run repair targets (`--include`) and
+ * defaults in deploy.yaml deployProfiles. Per-run repair targets (`--include`) and
  * rare tuning knobs intentionally stay out of the YAML contract.
  */
 
@@ -119,19 +119,20 @@ function resolveLlmRetryPolicy(
   profileBuild: BuildSection,
   baseBuild: BuildSection,
   env: NodeJS.ProcessEnv,
+  profileBuildPath = "deployProfile.build",
 ): RetryPolicy {
   const profileRetry = profileBuild.llmRetry;
   const baseRetry = baseBuild.llmRetry;
 
-  const profileMax = intFromYaml(profileRetry?.maxAttempts, "profile.build.llmRetry.maxAttempts", { min: 1 });
+  const profileMax = intFromYaml(profileRetry?.maxAttempts, `${profileBuildPath}.llmRetry.maxAttempts`, { min: 1 });
   const baseMax = intFromYaml(baseRetry?.maxAttempts, "deploy.build.llmRetry.maxAttempts", { min: 1 });
-  const profileInitial = intFromYaml(profileRetry?.initialBackoffMs, "profile.build.llmRetry.initialBackoffMs", { min: 0 });
+  const profileInitial = intFromYaml(profileRetry?.initialBackoffMs, `${profileBuildPath}.llmRetry.initialBackoffMs`, { min: 0 });
   const baseInitial = intFromYaml(baseRetry?.initialBackoffMs, "deploy.build.llmRetry.initialBackoffMs", { min: 0 });
-  const profileMaxBackoff = intFromYaml(profileRetry?.maxBackoffMs, "profile.build.llmRetry.maxBackoffMs", { min: 0 });
+  const profileMaxBackoff = intFromYaml(profileRetry?.maxBackoffMs, `${profileBuildPath}.llmRetry.maxBackoffMs`, { min: 0 });
   const baseMaxBackoff = intFromYaml(baseRetry?.maxBackoffMs, "deploy.build.llmRetry.maxBackoffMs", { min: 0 });
-  const profileMultiplier = numberFromYaml(profileRetry?.backoffMultiplier, "profile.build.llmRetry.backoffMultiplier", { min: 1 });
+  const profileMultiplier = numberFromYaml(profileRetry?.backoffMultiplier, `${profileBuildPath}.llmRetry.backoffMultiplier`, { min: 1 });
   const baseMultiplier = numberFromYaml(baseRetry?.backoffMultiplier, "deploy.build.llmRetry.backoffMultiplier", { min: 1 });
-  const profileJitter = numberFromYaml(profileRetry?.jitterRatio, "profile.build.llmRetry.jitterRatio", { min: 0, max: 1 });
+  const profileJitter = numberFromYaml(profileRetry?.jitterRatio, `${profileBuildPath}.llmRetry.jitterRatio`, { min: 0, max: 1 });
   const baseJitter = numberFromYaml(baseRetry?.jitterRatio, "deploy.build.llmRetry.jitterRatio", { min: 0, max: 1 });
 
   return {
@@ -185,11 +186,14 @@ export function resolveBuildConfig(
   config: ResolvedConfig,
   deps: ResolveBuildConfigDeps = {},
 ): ResolvedBuildOptions {
-  const profile = args.profile ? config.profiles?.[args.profile] : undefined;
-  if (args.profile && !profile) throw new ArgsError(`unknown --profile: ${args.profile}`);
+  const deployProfile = args.deployProfile ? config.deployProfiles?.[args.deployProfile] : undefined;
+  if (args.deployProfile && !deployProfile) throw new ArgsError(`unknown --deploy-profile: ${args.deployProfile}`);
 
   const baseBuild = buildSection(config.deploy?.["build"]);
-  const profileBuild = buildSection(profile?.["build"]);
+  const profileBuild = buildSection(deployProfile?.["build"]);
+  const profileBuildPath = args.deployProfile
+    ? `deployProfiles.${args.deployProfile}.build`
+    : "deployProfile.build";
   const configuredMode = modeValue(profileBuild?.mode ?? baseBuild?.mode);
   const env = deps.env ?? process.env;
   const envModeOverride = modeFromEnv(env, "UA_BUILD_MODE_OVERRIDE");
@@ -197,15 +201,15 @@ export function resolveBuildConfig(
   const cliBatchMode = args.batchMode !== "auto" ? args.batchMode : undefined;
   const batchMode: BatchMode =
     cliBatchMode
-    ?? batchModeFromYaml(profileBuild?.batchMode, "profile.build.batchMode")
+    ?? batchModeFromYaml(profileBuild?.batchMode, `${profileBuildPath}.batchMode`)
     ?? batchModeFromYaml(baseBuild?.batchMode, "deploy.build.batchMode")
     ?? "auto";
 
   const yamlMapperBatchCount =
-    intFromYaml(profileBuild?.mapperBatchCount, "profile.build.mapperBatchCount", { min: 1 })
+    intFromYaml(profileBuild?.mapperBatchCount, `${profileBuildPath}.mapperBatchCount`, { min: 1 })
     ?? intFromYaml(baseBuild?.mapperBatchCount, "deploy.build.mapperBatchCount", { min: 1 });
   const yamlMapperConcurrency =
-    intFromYaml(profileBuild?.mapperConcurrency, "profile.build.mapperConcurrency", { min: 1 })
+    intFromYaml(profileBuild?.mapperConcurrency, `${profileBuildPath}.mapperConcurrency`, { min: 1 })
     ?? intFromYaml(baseBuild?.mapperConcurrency, "deploy.build.mapperConcurrency", { min: 1 });
 
   const metrics = readHostMetrics(deps.hostMetrics ?? {});
@@ -235,10 +239,10 @@ export function resolveBuildConfig(
     llmRequired: args.llmRequired ?? profileBuild?.llmRequired ?? baseBuild?.llmRequired ?? false,
     llmModelCandidates: args.llmModelCandidates.length > 0
       ? args.llmModelCandidates
-      : stringArrayFromYaml(profileBuild?.llmModelCandidates, "profile.build.llmModelCandidates")
+      : stringArrayFromYaml(profileBuild?.llmModelCandidates, `${profileBuildPath}.llmModelCandidates`)
         ?? stringArrayFromYaml(baseBuild?.llmModelCandidates, "deploy.build.llmModelCandidates")
         ?? [],
-    llmRetryPolicy: resolveLlmRetryPolicy(args, profileBuild, baseBuild, env),
+    llmRetryPolicy: resolveLlmRetryPolicy(args, profileBuild, baseBuild, env, profileBuildPath),
     batchMode,
     mapperBatchCount,
     mapperConcurrency,

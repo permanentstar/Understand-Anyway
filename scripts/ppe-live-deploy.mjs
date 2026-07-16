@@ -13,15 +13,16 @@
 //   - reads back the real dashboard URL (with token) from the pid file
 //
 // No hacks: standard `pnpm pack` -> publish -> `npm install @understand-anyway/cli`
-// -> `understand-anyway init` -> `understand-anyway ops daily-update`. LLM is
-// driven by the built-in `cli-spawn` provider talking DIRECTLY to `traex exec`
-// (no shim): the real config file `scripts/deploy.ppe.yaml` sets
-// providers.llm.package=cli-spawn with command=traex + modelArg=-m, so the
-// orchestration-selected model is injected on the command line. The config is
-// scp'd to the standard data root as a real on-disk file (no base64 inlining).
+// `understand-anyway init` -> `understand-anyway ops daily-update`. LLM is
+// driven by the OSS `@understand-anyway/provider-trae-cli-v2` package talking
+// DIRECTLY to `traex exec` (no shim): the real config file
+// `scripts/deploy.ppe.yaml` sets llmProfiles.traex to the v2 provider with
+// command=traex + modelArg=-m, so the deploy-selected model is injected on the
+// command line. The config is scp'd to the standard data root as a real
+// on-disk file (no base64 inlining).
 //
 // Env (reuse scripts/release-gate-ppe-env.sh):
-//   UA_RELEASE_GATE_PPE_HOST / _USER / _ROOT / _PLUGIN_ROOT / _TRAEX_BIN
+//   UA_RELEASE_GATE_PPE_HOST / _USER / _ROOT / _PLUGIN_ROOT
 //   UA_RELEASE_GATE_PPE_REGISTRY (default http://127.0.0.1:4873)
 // Optional:
 //   UA_LIVE_DEPLOY_HOME    default: /home/<ppe-user>  (drives $HOME/understand-projects)
@@ -39,8 +40,12 @@ const PKG_DIRS = [
   "plugin-api",
   "core",
   "gateway",
+  "provider-cli-runtime",
   "provider-feishu-auth",
   "provider-feishu-sheets",
+  "provider-lark-im-notify",
+  "provider-trae-cli-v1",
+  "provider-trae-cli-v2",
   "cli",
 ];
 
@@ -76,11 +81,6 @@ function buildEnv() {
   return { host, user, pluginRoot, registry, registryListen, home, projectsRoot, toolRoot, tarballDir, port, project };
 }
 
-// llm workdir for `traex exec -C <dir>` (must match deploy.ppe.yaml's -C path).
-function llmWorkdir(env) {
-  return resolve(env.projectsRoot, "gateway", ".understand-anything", "llm-work");
-}
-
 function buildDeployCommand(env) {
   const toolRoot = env.toolRoot;
   const projectsRoot = env.projectsRoot;
@@ -93,7 +93,6 @@ function buildDeployCommand(env) {
   const npmrcFile = resolve(toolRoot, "npmrc");
   const tarballDir = env.tarballDir;
   const stagedConfig = resolve(tarballDir, "deploy.ppe.yaml");
-  const workdir = llmWorkdir(env);
   const registryNoScheme = env.registry.replace(/^https?:/, "");
   // Shared-gateway dashboard writes its pid (with url+token) under the gateway
   // state root, not the per-project dir.
@@ -141,7 +140,7 @@ function buildDeployCommand(env) {
     "set -euo pipefail",
     // Reset both the standard data root and the deploy-tool scratch.
     `rm -rf ${quote(projectsRoot)} ${quote(toolRoot)}`,
-    `mkdir -p ${quote(installRoot)} ${quote(srcRoot)} ${quote(resolve(projectsRoot, "gateway", "config"))} ${quote(workdir)} ${quote(resolve(toolRoot, "verdaccio-storage"))}`,
+    `mkdir -p ${quote(installRoot)} ${quote(srcRoot)} ${quote(resolve(projectsRoot, "gateway", "config"))} ${quote(resolve(toolRoot, "verdaccio-storage"))}`,
     `printf %s ${quote(encodedGreet)} | base64 -d > ${quote(resolve(srcRoot, "greet.js"))}`,
     `printf %s ${quote(encodedIndex)} | base64 -d > ${quote(resolve(srcRoot, "index.js"))}`,
     // Real config file (scp'd, not inlined): place the standard deploy.yaml.
@@ -167,8 +166,8 @@ function buildDeployCommand(env) {
     [
       "understand-anyway ops daily-update",
       `--project ${quote(env.project)}`,
-      "--profile small",
       "--deploy-profile ppe",
+      "--llm-profile traex",
       `--host ${quote(env.host)}`,
       `--port ${env.port}`,
       "--no-self-update",

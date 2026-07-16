@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Publish the six @understand-anyway/* packages into a Verdaccio registry that
+// Publish the ten @understand-anyway/* packages into a Verdaccio registry that
 // runs locally on the PPE host, so the standard OSS install path can be
 // exercised there without touching public npm.
 //
@@ -22,8 +22,12 @@ const PKG_DIRS = [
   "plugin-api",
   "core",
   "gateway",
+  "provider-cli-runtime",
   "provider-feishu-auth",
   "provider-feishu-sheets",
+  "provider-lark-im-notify",
+  "provider-trae-cli-v1",
+  "provider-trae-cli-v2",
   "cli",
 ];
 
@@ -31,7 +35,7 @@ function usage() {
   return [
     "Usage: node scripts/release-gate-ppe-verdaccio.mjs [--dry-run]",
     "",
-    "Builds and packs the six @understand-anyway/* packages locally, then starts",
+    "Builds and packs the ten @understand-anyway/* packages locally, then starts",
     "a Verdaccio registry on the PPE host and publishes the tarballs into it.",
     "",
     "Required env:",

@@ -203,8 +203,12 @@ test("publishCommands publishes dependency packages before the CLI", () => {
     "packages/plugin-api",
     "packages/core",
     "packages/gateway",
+    "packages/provider-cli-runtime",
     "packages/provider-feishu-auth",
     "packages/provider-feishu-sheets",
+    "packages/provider-lark-im-notify",
+    "packages/provider-trae-cli-v1",
+    "packages/provider-trae-cli-v2",
     "packages/cli",
   ]);
 });

@@ -3,8 +3,8 @@
  *
  * The open-source CLI discovers a single `deploy.yaml` (see
  * {@link CONFIG_FILE_NAMES} / {@link CONFIG_ENV_VAR}), parses + interpolates it,
- * then layers CLI > env > profile > base into a {@link ResolvedConfig}. This
- * module only declares the shape + the discovery constants; the actual
+ * then layers CLI/env/deploy-profile/base values into a {@link ResolvedConfig}.
+ * This module only declares the shape + the discovery constants; the actual
  * discovery/interpolation/layering mechanism lives in the CLI package.
  *
  * Mirrors the "type + runtime constant" co-location of provider-factory.ts and
@@ -52,6 +52,11 @@ export interface DeployConfig {
   [key: string]: unknown;
 }
 
+/** Shared gateway runtime defaults. */
+export interface GatewayConfig {
+  retain?: number;
+}
+
 /** A single dynamically-loaded provider: package name + opaque factory config. */
 export interface ProviderEntry {
   /** Package name to `import()`; the only source of provider package names. */
@@ -94,12 +99,26 @@ export interface ProfileSection {
   [key: string]: unknown;
 }
 
+/**
+ * Deployment environment profile. Keeps environment topology/spec choices
+ * orthogonal to LLM provider protocol choices.
+ */
+export interface DeployProfileSection {
+  deploy?: DeployConfig;
+  gateway?: GatewayConfig;
+  build?: BuildConfig;
+  [key: string]: unknown;
+}
+
 /** Fully discovered + interpolated + layered runtime config. */
 export interface ResolvedConfig {
   deploy?: DeployConfig;
+  gateway?: GatewayConfig;
   providers?: ProvidersConfig;
   record?: RecordSection;
   profiles?: Record<string, ProfileSection>;
+  deployProfiles?: Record<string, DeployProfileSection>;
+  llmProfiles?: Record<string, ProviderEntry>;
 }
 
 /** Default config filenames, searched in order relative to each base dir. */

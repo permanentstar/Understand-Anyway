@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ResolvedConfig } from "@understand-anyway/plugin-api";
 import { buildLlmProvider } from "./build-llm.js";
 
@@ -51,5 +51,17 @@ describe("buildLlmProvider", () => {
       importModule,
     });
     expect(provider?.name).toBe("mock");
+  });
+
+  it("no longer treats cli-spawn as a builtin provider name", async () => {
+    const importModule = vi.fn().mockResolvedValue(fakeLlmModule);
+    const provider = await buildLlmProvider({
+      enabled: true,
+      packageName: "cli-spawn",
+      config: { providers: { llm: { package: "cli-spawn", config: { model: "m" } } } } as ResolvedConfig,
+      importModule,
+    });
+    expect(importModule).toHaveBeenCalledWith("cli-spawn");
+    expect(provider?.name).toBe("fake-llm");
   });
 });

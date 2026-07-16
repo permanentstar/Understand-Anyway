@@ -217,6 +217,34 @@ function runScript(scriptPath, args, env) {
   }
 }
 
+// --- Test 1c: deploy/llm profiles are forwarded and legacy --profile is not required ---
+{
+  const work = makeTmp();
+  try {
+    const { scriptPath, nightlyLog, refreshLog } = setupSandbox(work);
+    const { binDir } = setupFakeBin(work);
+    writeFileSync(resolve(work, "gateway-list.json"), JSON.stringify([{ versionId: "v1", current: true, stable: true }]));
+
+    const env = {
+      ...process.env,
+      PATH: `${binDir}:${process.env.PATH}`,
+      UA_PROJECTS_ROOT: resolve(work, "projects"),
+      HOME: work,
+    };
+    const result = runScript(scriptPath, ["--no-self-update", "--deploy-profile", "ppe", "--llm-profile", "traex"], env);
+    check("profiles: exit 0", result.status === 0, `${result.status}\n${result.stderr}`);
+    const nightly = existsSync(nightlyLog) ? readFileSync(nightlyLog, "utf8") : "";
+    const refresh = existsSync(refreshLog) ? readFileSync(refreshLog, "utf8") : "";
+    check("profiles: nightly got deploy profile", nightly.includes("--deploy-profile ppe"), nightly);
+    check("profiles: nightly got llm profile", nightly.includes("--llm-profile traex"), nightly);
+    check("profiles: nightly does not get legacy --profile", !nightly.includes("--profile "), nightly);
+    check("profiles: refresh got deploy profile", refresh.includes("--deploy-profile ppe"), refresh);
+    check("profiles: refresh does not get legacy --profile", !refresh.includes("--profile "), refresh);
+  } finally {
+    cleanupWork(work);
+  }
+}
+
 // --- Test 2: --no-self-update skips git pull / pnpm ---
 {
   const work = makeTmp();
@@ -481,9 +509,9 @@ function runScript(scriptPath, args, env) {
   }
 }
 
-// --- Test 9 removed: LLM flags are no longer CLI surface; they live in
-// deploy.yaml under profiles.<name>.build.llm* and providers.llm. The CLI
-// surface kept is just --profile.
+// --- Test 9 removed: low-level LLM flags are no longer CLI surface; build
+// specs live under deployProfiles.*.build and provider configs under
+// llmProfiles.*.
 
 // --- Test 10 removed: --print-deploy-context is gone. Inspect
 // $UA_DEPLOY_PROFILE / $UA_PROJECTS_ROOT directly when debugging.

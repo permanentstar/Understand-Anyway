@@ -65,7 +65,7 @@ export interface BuildArgs {
   excludeTests: boolean | null;
   /** Override upstream plugin location (else env/home discovery). */
   pluginRoot: string | null;
-  /** Output language for summaries/descriptions. Null = config/profile/default. */
+  /** Output language for summaries/descriptions. Null = config/deploy-profile/default. */
   outputLanguage: string | null;
   /** Build intent; C5 keeps public modes template-oriented. */
   mode: BuildMode;
@@ -73,12 +73,14 @@ export interface BuildArgs {
   includePaths: string[];
   /** Unified YAML deploy config file/dir. Null = discover. */
   config: string | null;
-  /** Named build profile from the config's profiles map. */
-  profile: string | null;
+  /** Deployment environment profile from deployProfiles.*. */
+  deployProfile: string | null;
   /** Enable optional LLM enrichment. Null = unset (CLI defers to config/default off). */
   llmAnalysis: boolean | null;
   /** Provider package name for LLM enrichment. Null = unset (defers to config). */
   llmProvider: string | null;
+  /** LLM provider profile from llmProfiles.*. */
+  llmProfile: string | null;
   /** Provider package name for semantic embeddings. Null = unset. */
   embeddingProvider: string | null;
   /** Ordered model candidates for provider requests. Empty = provider default. */
@@ -423,11 +425,12 @@ build options:
   --backfill            Repair missing/current files via explicit --include or auto-detect
   --include <path>      Optional include path for --backfill (repeatable)
   --config <file|dir>   Unified YAML deploy config; discovered if omitted
-  --profile <name>      Apply a named build profile from the config
+  --deploy-profile <p>  Apply deployProfiles.<p>.build defaults (ppe=small, prod=large)
+  --llm-profile <name>  Apply llmProfiles.<name> provider config
   --exclude-tests       Filter test files out of the graph (default)
   --include-tests       Keep test files in the graph
   --plugin-root <dir>   Override upstream Understand-Anything plugin location
-  --output-language <l> Summary/description language (default: config/profile/en)
+  --output-language <l> Summary/description language (default: config/deploy-profile/en)
   --llm-analysis        Enable optional LLM enrichment (default: disabled)
   --llm-provider <pkg>  Provider package for LLM enrichment (required with --llm-analysis)
   --embedding-provider <pkg> Provider package for semantic embeddings / search
@@ -649,9 +652,10 @@ function parseBuildArgs(rest: string[]): ParsedArgs {
   let mode: BuildMode | null = null;
   const includePaths: string[] = [];
   let config: string | null = null;
-  let profile: string | null = null;
+  let deployProfile: string | null = null;
   let llmAnalysis: boolean | null = null;
   let llmProvider: string | null = null;
+  let llmProfile: string | null = null;
   let embeddingProvider: string | null = null;
   let llmModelCandidates: string[] = [];
   let llmRequired: boolean | null = null;
@@ -688,8 +692,11 @@ function parseBuildArgs(rest: string[]): ParsedArgs {
       case "--config":
         config = takeValue(arg, rest[++i]);
         break;
-      case "--profile":
-        profile = takeValue(arg, rest[++i]);
+      case "--deploy-profile":
+        deployProfile = takeValue(arg, rest[++i]);
+        break;
+      case "--llm-profile":
+        llmProfile = takeValue(arg, rest[++i]);
         break;
       case "--exclude-tests":
         excludeTests = true;
@@ -756,9 +763,10 @@ function parseBuildArgs(rest: string[]): ParsedArgs {
     mode: selectedMode,
     includePaths,
     config,
-    profile,
+    deployProfile,
     llmAnalysis,
     llmProvider,
+    llmProfile,
     embeddingProvider,
     llmModelCandidates,
     llmRequired,

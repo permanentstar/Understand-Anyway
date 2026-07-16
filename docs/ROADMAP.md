@@ -55,7 +55,7 @@ The first OSS release ships the orchestration layer described in
 |---|---|
 | Multi-group aggregate gateway routing (proxy lib + WS) | Only worth doing once projects-per-deployment outgrows a single shared port. |
 | MCP server front end | Frame for AI clients to call into the read-only API; pending broader MCP adoption. |
-| First-class TypeScript publishing for `plugin-api` (independent versioning) | Today all six packages share one version via manual lockstep (`scripts/release.mjs`); SPI may want its own cadence after `0.1`. |
+| First-class TypeScript publishing for `plugin-api` (independent versioning) | Today all ten packages share one version via manual lockstep (`scripts/release.mjs`); SPI may want its own cadence after `0.1`. |
 | Public release pipeline (npm publish via `scripts/release.mjs` from a maintainer machine) | Manual release script is wired; pending the first public maintainer credential and a shakedown release. |
 
 ## Upstream coupling

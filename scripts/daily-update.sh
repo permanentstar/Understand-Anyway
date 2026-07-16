@@ -46,10 +46,10 @@ Options:
                           (deploy.yaml: deploy.port)
   --project <id>          Restrict run to one projectId from
                           <projectsRoot>/gateway/config/projects.json. Default: all.
-  --profile <name>        Build/serve profile to apply (deploy.yaml
-                          profiles.*). Default: deploy.* base only.
   --deploy-profile <p>    Override deployment profile (prod|ppe|dev). Default:
                           $UA_DEPLOY_PROFILE in ~/.env; no auto-detection.
+  --llm-profile <name>    LLM profile (deploy.yaml llmProfiles.*) forwarded to
+                          nightly build.
   --plugin-root <path>    Override upstream plugin root. Default:
                           $UA_PLUGIN_ROOT or auto-discovery.
   --no-self-update        Skip `git pull && pnpm install && pnpm build`.
@@ -67,7 +67,7 @@ host="127.0.0.1"
 port="18666"
 project=""
 deploy_profile_cli=""
-profile=""
+llm_profile=""
 plugin_root=""
 no_pull="false"
 self_update="true"
@@ -80,7 +80,7 @@ while [[ $# -gt 0 ]]; do
     --port)            require_value "$1" "${2:-}"; port="$2"; shift 2 ;;
     --project)         require_value "$1" "${2:-}"; project="$2"; shift 2 ;;
     --deploy-profile)  require_value "$1" "${2:-}"; deploy_profile_cli="$2"; shift 2 ;;
-    --profile)         require_value "$1" "${2:-}"; profile="$2"; shift 2 ;;
+    --llm-profile)     require_value "$1" "${2:-}"; llm_profile="$2"; shift 2 ;;
     --plugin-root)     require_value "$1" "${2:-}"; plugin_root="$2"; shift 2 ;;
     --no-pull)         no_pull="true"; shift ;;
     --no-self-update)  self_update="false"; shift ;;
@@ -97,6 +97,7 @@ done
 if ! deploy_profile="$(resolve_deploy_profile "$deploy_profile_cli")"; then
   exit 2
 fi
+export UA_DEPLOY_PROFILE="$deploy_profile"
 
 UA_DRY_RUN="$dry_run"
 export UA_DRY_RUN
@@ -239,7 +240,8 @@ fi
 nightly_args=()
 if [[ -n "$project" ]]; then nightly_args+=(--project "$project"); fi
 if [[ "$no_pull" == "true" ]]; then nightly_args+=(--no-pull); fi
-if [[ -n "$profile" ]]; then nightly_args+=(--profile "$profile"); fi
+nightly_args+=(--deploy-profile "$deploy_profile")
+if [[ -n "$llm_profile" ]]; then nightly_args+=(--llm-profile "$llm_profile"); fi
 if [[ "$dry_run" == "true" ]]; then nightly_args+=(--dry-run); fi
 
 stage_begin
@@ -264,7 +266,6 @@ fi
 # 4. refresh-prod-server
 refresh_args=(--host "$host" --port "$port" --deploy-profile "$deploy_profile")
 if [[ -n "$project" ]]; then refresh_args+=(--project "$project"); fi
-if [[ -n "$profile" ]]; then refresh_args+=(--profile "$profile"); fi
 if [[ -n "$resolved_plugin_root" ]]; then refresh_args+=(--plugin-root "$resolved_plugin_root"); fi
 if [[ "$dry_run" == "true" ]]; then refresh_args+=(--dry-run); fi
 

@@ -16,7 +16,7 @@
 | In | Out |
 |----|-----|
 | 单项目（mini-project） | 多项目共享 gateway 拓扑（见 shared-gateway 用例） |
-| mock LLM provider | 真实 cli-spawn |
+| mock LLM provider | 真实 `@understand-anyway/provider-trae-cli-v2` |
 | 本机磁盘 | 远端机器 |
 | Vite 产物 base 路径修复 | npm 安装/发布链路 |
 
@@ -36,7 +36,7 @@
 2. `gateway/registry.json` 中 `prodDistDir` 指向 `versions/<vid>/dashboard-dist`。
 3. 浏览器访问 `http://127.0.0.1:18666/` 看到 portal 卡片，点击直达 mini-project dashboard，**不卡 loading**。
 4. 浏览器 Network 面板里 `index-*.js`、`*.css` 请求路径为 `/project/mini-project/assets/...`，HTTP 200。
-5. `daily-update.sh --host 0.0.0.0 --port 18666 --deploy-profile ppe --profile small` mock LLM 全链路退出码 0。
+5. `daily-update.sh --host 0.0.0.0 --port 18666 --deploy-profile ppe --llm-profile traex` mock LLM 全链路退出码 0。
 6. `aggregate-nightly` 写入 `<UA_PROJECTS_ROOT>/gateway/operations/nightly-latest.json` 含 mini-project 条目，`overallStatus=success`。
 
 ## 失败兜底

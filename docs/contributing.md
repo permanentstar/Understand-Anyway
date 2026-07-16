@@ -135,7 +135,7 @@ The script:
 1. Refuses to execute on a dirty tree. Real public releases also require
    branch `main`, synced with `origin/main` (local `--skip-git` rehearsals skip
    the branch/sync check only).
-2. Refuses to run if the six packages are not all at the same version, if the
+2. Refuses to run if the ten packages are not all at the same version, if the
    target version already exists in the target registry, or if the local
    baseline is older than the latest registry version.
 3. Rewrites every `packages/*/package.json` `version` field.
@@ -196,7 +196,8 @@ parameter template, or a one-off override.
    must override env, profile, deploy defaults, and built-in defaults.
 
 The hard boundary: profile never expresses the action. `gateway rollback` is a
-subcommand; `build --profile nightly` is a build with a parameter template.
+subcommand; `build --deploy-profile prod --llm-profile traex` is a build with
+a parameter template.
 
 ## Profile design rules
 
@@ -320,3 +321,48 @@ Fix failures by moving shared logic into `dashboard-shared/**`, keeping
 prod-only lifecycle code under `dashboard-prod/**`, and keeping dev-only Vite
 helpers under `dashboard-dev/**`. Do not silence the guard with broad allowlists
 unless the boundary itself changed and the docs explain the new rule.
+
+## Python import-map fallback
+
+`packages/core/src/build/import-map.ts` carries one intentional downstream
+workaround for Python repos whose internal imports are not fully resolved by the
+upstream analyzer registry.
+
+### When it applies
+
+This fallback is only for deterministic `scan.importMap` augmentation. It helps
+when a repo uses Python package roots declared through local `pyproject.toml`
+files and `tool.hatch.build.targets.wheel.packages`, so imports such as
+`from app.gateway.authz import ...` or `from deerflow.runtime... import ...`
+would otherwise miss internal file targets.
+
+### What it does
+
+- keeps the upstream `registry.resolveImports()` result as the primary source;
+- builds a best-effort Python package-root index from repo-local
+  `pyproject.toml` files plus top-level `__init__.py` packages inside each
+  Python project root;
+- parses Python `from ... import ...` / `import ...` statements and resolves
+  them back to in-repo module files or package `__init__.py` files;
+- merges the recovered targets into `scan.importMap` before batch computation.
+
+Scope is intentionally narrow: this only improves deterministic import edges for
+batching / graph assembly. It does not change LLM prompting, graph-level LLM
+enhancement, or any provider behavior.
+
+### Maintenance rule
+
+Treat this as a compatibility patch, not a new extension surface. If the
+upstream plugin later gains equivalent native support for these Python layouts,
+prefer removing the fallback and keeping the OSS core aligned with upstream
+again.
+
+The regression coverage lives in:
+
+- `packages/core/src/build/import-map.test.ts`
+
+Quick verification:
+
+```bash
+pnpm --filter @understand-anyway/core exec vitest run src/build/import-map.test.ts
+```

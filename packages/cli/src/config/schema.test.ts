@@ -72,6 +72,33 @@ describe("validateDeployConfig", () => {
     expect(validateDeployConfig(cfg).valid).toBe(false);
   });
 
+  it("accepts deployProfiles and llmProfiles", () => {
+    const cfg = valid();
+    cfg.deployProfiles = {
+      ppe: {
+        deploy: { port: 18690, outputLanguage: "zh" },
+        gateway: { retain: 2 },
+        build: { mode: "full", llmAnalysis: true, llmRequired: false },
+      },
+      prod: {
+        deploy: { port: 18666, outputLanguage: "zh" },
+        gateway: { retain: 5 },
+        build: { mode: "incremental", llmAnalysis: true, llmRequired: true },
+      },
+    };
+    cfg.llmProfiles = {
+      traex: {
+        package: "@understand-anyway/provider-trae-cli-v2",
+        config: { command: "traex", modelArg: "-m" },
+      },
+      traecli: {
+        package: "@understand-anyway/provider-trae-cli-v1",
+        config: { command: "traecli" },
+      },
+    };
+    expect(validateDeployConfig(cfg).valid).toBe(true);
+  });
+
   it("passes unknown fields through on deploy (portal display passthrough)", () => {
     const cfg = valid();
     (cfg.deploy as Record<string, unknown>).title = "My Portal";

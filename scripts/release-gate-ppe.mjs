@@ -9,8 +9,12 @@ const PKG_DIRS = [
   "plugin-api",
   "core",
   "gateway",
+  "provider-cli-runtime",
   "provider-feishu-auth",
   "provider-feishu-sheets",
+  "provider-lark-im-notify",
+  "provider-trae-cli-v1",
+  "provider-trae-cli-v2",
   "cli",
 ];
 
@@ -120,8 +124,8 @@ function buildRepoCommand(env) {
     [
       "bash scripts/daily-update.sh",
       "--project understand-anyway-main",
-      "--profile small",
       "--deploy-profile ppe",
+      "--llm-profile traex",
       `--host ${quote(env.host)}`,
       "--port 18666",
       "--no-self-update",
@@ -140,8 +144,8 @@ function buildNpmInstalledCommand(env) {
     [
       "bash scripts/daily-update.sh",
       "--project understand-anyway-npm",
-      "--profile small",
       "--deploy-profile ppe",
+      "--llm-profile traex",
       `--host ${quote(env.host)}`,
       "--port 18672",
       "--no-self-update",
@@ -186,7 +190,8 @@ function buildOpsCommand(env) {
 
 // Command segments that install a temporary `llm` shim (backed by `traex
 // exec`) onto PATH and log in via Trae/Codebase auth. Shared by ppe-real-llm
-// and ppe-oss-release so both drive real LLM through traex, not Feishu SSO.
+// and ppe-oss-release so both drive real LLM through
+// `@understand-anyway/provider-trae-cli-v2`, not Feishu SSO.
 function traexShimSetupSegments(env, workRoot) {
   const shimRoot = resolve(workRoot, "llm-shim");
   const shimFile = resolve(shimRoot, "llm");
@@ -280,20 +285,25 @@ function buildOssReleaseCommand(env, workRoot) {
     "  outputLanguage: \"en\"",
     "gateway:",
     "  retain: 2",
-    "providers:",
-    "  llm:",
-    "    package: \"cli-spawn\"",
+    "llmProfiles:",
+    "  traex:",
+    "    package: \"@understand-anyway/provider-trae-cli-v2\"",
+    "    config:",
+    "      command: \"traex\"",
+    "      args: [\"exec\", \"--skip-git-repo-check\", \"--dangerously-bypass-approvals-and-sandbox\", \"--ephemeral\"]",
+    "      modelArg: \"-m\"",
+    "      promptMode: \"arg\"",
     "record:",
     "  providers: [\"local\"]",
-    "profiles:",
-    "  small:",
-    "    use: [llm]",
+    "deployProfiles:",
+    "  ppe:",
     "    build:",
     "      mode: \"full\"",
     "      excludeTests: true",
     "      outputLanguage: \"en\"",
     "      llmAnalysis: true",
     "      llmRequired: false",
+    "      llmModelCandidates: [\"small\"]",
     "",
   ].join("\n");
   const encodedYaml = Buffer.from(deployYaml, "utf8").toString("base64");
@@ -345,7 +355,7 @@ function buildOssReleaseCommand(env, workRoot) {
     `setsid npx --yes verdaccio@6 --listen ${env.registryListen} --config ${quote(verdaccioConfigFile)} </dev/null >${quote(verdaccioLog)} 2>&1 & VERDACCIO_PID=$!`,
     // Wait for the registry to accept connections.
     `for i in $(seq 1 30); do if curl -sf -o /dev/null ${env.registry}/-/ping 2>/dev/null || curl -sf -o /dev/null ${env.registry}/ 2>/dev/null; then break; fi; sleep 1; done`,
-    // Publish the six packages in dependency order.
+    // Publish the OSS packages in dependency order.
     ...publishSegments,
     // Standard install from the local registry into a clean prefix.
     `cd ${quote(installRoot)}`,
@@ -359,8 +369,8 @@ function buildOssReleaseCommand(env, workRoot) {
     [
       "understand-anyway ops daily-update",
       "--project oss-release-smoke",
-      "--profile small",
       "--deploy-profile ppe",
+      "--llm-profile traex",
       `--host ${quote(env.host)}`,
       "--port 18690",
       "--no-self-update",
@@ -435,7 +445,7 @@ export function buildOssReleaseTeardownSshCommand(env) {
   return ["ssh", "-n", "-o", "BatchMode=yes", `${env.user}@${env.host}`, remote];
 }
 
-// For ppe-oss-release: build + pack the six packages locally and scp the
+// For ppe-oss-release: build + pack the OSS packages locally and scp the
 // tarballs to the PPE staging dir. The remote command then publishes them into
 // a session-local Verdaccio. Kept here (not in the remote string) so the heavy
 // lifting runs on the controller, not inside the ssh channel.

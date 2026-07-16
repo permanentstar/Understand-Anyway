@@ -16,7 +16,7 @@ import { runCompat } from "./compat.js";
 import { runInit } from "./init.js";
 import { runServe } from "./serve.js";
 import { parseWorkerArgs, runBatchMapperWorker } from "./batch-mapper-worker.js";
-import { buildLlmProvider } from "./build-llm.js";
+import { buildLlmProvider, resolveLlmProfile } from "./build-llm.js";
 import { runDashboard } from "./dashboard-prod/index.js";
 import { runDashboardServer } from "./dashboard-prod/dashboard-server.js";
 import { DASHBOARD_SERVER_SUBCOMMAND } from "./dashboard-prod/dashboard-start.js";
@@ -57,14 +57,19 @@ async function main(argv: string[]): Promise<void> {
       const workerArgs = parseWorkerArgs(argv.slice(1));
       const log = (line: string) => process.stdout.write(`${line}\n`);
       await runBatchMapperWorker(workerArgs, log, {
-        loadLlmProvider: async (packageName, configPath) => {
+        loadLlmProvider: async (packageName, configPath, llmProfile) => {
           // Reuse the public CLI loader so the worker honours the same
           // ProviderRegistry contract as the parent.
           const config = loadResolvedConfig({ config: configPath, configExplicit: Boolean(configPath) }, {
             cwd: process.cwd(),
             env: process.env,
           });
-          const provider = await buildLlmProvider({ enabled: true, packageName, config });
+          const resolvedProfile = llmProfile ? resolveLlmProfile(config, llmProfile) : null;
+          const provider = await buildLlmProvider({
+            enabled: true,
+            packageName: packageName ?? resolvedProfile?.packageName ?? null,
+            config: resolvedProfile?.config ?? config,
+          });
           return provider;
         },
       });

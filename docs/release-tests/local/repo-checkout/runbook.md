@@ -97,7 +97,7 @@ ua project-state publish "$VID" \
   --host 0.0.0.0 \
   --port 18666 \
   --deploy-profile ppe \
-  --profile small
+  --llm-profile traex
 ```
 
 验证：

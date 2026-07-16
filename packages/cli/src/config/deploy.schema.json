@@ -14,6 +14,14 @@
     "gateway": { "$ref": "#/definitions/gateway" },
     "providers": { "$ref": "#/definitions/providers" },
     "record": { "$ref": "#/definitions/record" },
+    "deployProfiles": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/deployProfile" }
+    },
+    "llmProfiles": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/providerEntry" }
+    },
     "profiles": {
       "type": "object",
       "additionalProperties": { "$ref": "#/definitions/profile" }
@@ -85,6 +93,16 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "build": { "$ref": "#/definitions/build" }
+      }
+    },
+    "deployProfile": {
+      "type": "object",
+      "description": "A named deployment environment profile. Unknown fields pass through.",
+      "additionalProperties": true,
+      "properties": {
+        "deploy": { "$ref": "#/definitions/deploy" },
+        "gateway": { "$ref": "#/definitions/gateway" },
         "build": { "$ref": "#/definitions/build" }
       }
     },

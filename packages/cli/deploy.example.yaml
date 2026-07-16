@@ -20,10 +20,9 @@
 
 version: 1
 
-# Layer 4 (base): global deploy defaults. Overridden per-field by a profile,
-# then supported env overrides (UA_SERVE_HOST / UA_SERVE_PORT), then explicit
-# CLI flags. Topology flags such as the deployment profile (prod|ppe|dev)
-# live in ~/.env as UA_DEPLOY_PROFILE; the CLI accepts an override only.
+# Layer 4 (base): global deploy defaults. Deployment-specific overrides live
+# under deployProfiles.*.deploy, then supported env overrides
+# (UA_SERVE_HOST / UA_SERVE_PORT), then explicit CLI flags.
 deploy:
   host: "0.0.0.0"
   port: 18666
@@ -52,15 +51,21 @@ providers:
     package: "<your-portal-assets-package>"
     config:
       routePrefix: "/portal-assets/"
-  # Optional LLM enrichment provider. Loaded dynamically by package name; the
-  # open-source build stays deterministic unless a profile enables it via
-  # `build.llmAnalysis: true`. There is no CLI surface for LLM flags anymore —
-  # configure everything here, then select the profile with `--profile <name>`.
-  llm:
-    package: "<your-llm-provider-package>"
+
+# Orthogonal LLM provider profiles. Select one at build time with
+# `--llm-profile <name>`; the selected entry is expanded into providers.llm.
+llmProfiles:
+  traex:
+    package: "<your-trae-cli-v2-provider-package>"
     config:
+      command: "traex"
       model: "<your-model>"
-      modelCandidates: ["small", "large"]
+      modelArg: "-m"
+  traecli:
+    package: "<your-trae-cli-v1-provider-package>"
+    config:
+      command: "traecli"
+      model: "<your-model>"
 
 # Record sinks. Set `providers: []` to disable external records entirely.
 # Per-provider config goes under `config` keyed by provider name.
@@ -74,29 +79,42 @@ record:
         project: "project-update"
       mappings: {}
 
-# Layer 3: named profiles, selected with `--profile <name>` (for build/nightly
-# scripts) or `--serve-profile <name>` (for `dashboard start` and friends).
-profiles:
-  sso-portal:
-    portal: true
-    projectRoute: true
-    use: [auth, orgPolicy, portalAssets]   # which providers.* blocks to activate
-    registry: "/path/to/understand-projects/gateway/registry.json"
+# Deployment environment profiles. Build spec follows deploy profile:
+# ppe = small, prod = large. Later environments can copy this pattern.
+deployProfiles:
+  ppe:
+    deploy:
+      host: "0.0.0.0"
+      port: 18690
+      outputLanguage: "en"
+    gateway:
+      retain: 2
+    build:
+      mode: "full"
+      excludeTests: true
+      outputLanguage: "en"
+      llmAnalysis: true
+      llmRequired: false
+      llmModelCandidates: ["small"]
+      llmRetry:
+        maxAttempts: 2
+        initialBackoffMs: 300
+        maxBackoffMs: 10000
 
-  # Build-oriented profiles. `build.llmAnalysis` enables optional LLM
-  # enrichment; `build.llmRequired` turns provider/parse failures into hard
-  # build failures. Both default false. `build.llmRetry` tunes the
-  # transient-retry loop around a single LLM call (C8); omitted fields fall
-  # back to DEFAULT_RETRY_POLICY (3 attempts, 500ms initial backoff, 2x
-  # multiplier, 30s cap, ±20% jitter).
-  large:
-    use: [llm]
+  prod:
+    deploy:
+      host: "0.0.0.0"
+      port: 18666
+      outputLanguage: "en"
+    gateway:
+      retain: 3
     build:
       mode: "incremental"
       excludeTests: true
       outputLanguage: "en"
       llmAnalysis: true
       llmRequired: false
+      llmModelCandidates: ["large"]
       llmRetry:
         maxAttempts: 3
         initialBackoffMs: 500
@@ -104,23 +122,11 @@ profiles:
         maxBackoffMs: 30000
         jitterRatio: 0.2
 
-  small:
-    use: [llm]
-    build:
-      mode: "incremental"
-      excludeTests: true
-      llmAnalysis: true
-      llmRetry:
-        maxAttempts: 2
-        initialBackoffMs: 300
-        maxBackoffMs: 10000
-
-  # Mock LLM profile for local repo-checkout verification. Keeps the pipeline
-  # deterministic while exercising the LLM enrichment code paths.
-  mock-llm:
-    use: [llm]
-    build:
-      mode: "incremental"
-      excludeTests: true
-      llmAnalysis: true
-      llmRequired: false
+# Serve-only profiles, selected with `--serve-profile <name>` for
+# `dashboard start`, `gateway start`, and direct `serve`.
+profiles:
+  sso-portal:
+    portal: true
+    projectRoute: true
+    use: [auth, orgPolicy, portalAssets]   # which providers.* blocks to activate
+    registry: "/path/to/understand-projects/gateway/registry.json"

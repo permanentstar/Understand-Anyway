@@ -29,7 +29,7 @@ node "$UA_REPO_ROOT/packages/cli/dist/cli.js" init "$UA_PROJECTS_ROOT/src/mini-p
 # 3. 走 daily-update 把两个项目都跑一遍
 "$UA_REPO_ROOT/scripts/daily-update.sh" \
   --host 0.0.0.0 --port 18666 \
-  --deploy-profile ppe --profile small
+  --deploy-profile ppe --llm-profile traex
 ```
 
 ## 浏览器验收

@@ -10,7 +10,8 @@
 //
 // LLM enrichment is exercised only in case 3:
 //   - --profile oss        → builtin "mock" provider (deterministic stub)
-//   - --profile real-llm   → builtin "cli-spawn" provider (real CLI, requires `llm` on PATH)
+//   - --profile real-llm   → `@understand-anyway/provider-trae-cli-v2`
+//                            (real CLI, requires `llm` on PATH)
 //
 // Usage:
 //   pnpm run delivery:local [--profile oss|real-llm] [--only repo-checkout|verdaccio|shared-gateway]
@@ -99,7 +100,7 @@ function printHelp() {
       "Usage: pnpm run delivery:local [options]",
       "",
       "Options:",
-      "  --profile <oss|real-llm>   LLM profile for case 3. oss=mock (default), real-llm=cli-spawn",
+      "  --profile <oss|real-llm>   LLM profile for case 3. oss=mock (default), real-llm=provider-trae-cli-v2",
       "  --only <case>               Run only one case (repo-checkout|verdaccio|shared-gateway)",
       "  --keep-running              After case 3, leave the gateway running and print URL/token/PID",
       "  --keep-temp                 Do not delete temp work dirs (debug)",
@@ -630,7 +631,7 @@ function llmFlagsForProfile(profile) {
   // would always fail the build. We assert observable file-level outputs
   // (node summaries / llm-mock tag) directly in assertLlmArtifacts instead.
   if (profile === "real-llm") {
-    return ["--llm-analysis", "--llm-provider", "cli-spawn"];
+    return ["--llm-analysis", "--llm-provider", "@understand-anyway/provider-trae-cli-v2"];
   }
   return ["--llm-analysis", "--llm-provider", "mock"];
 }

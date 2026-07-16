@@ -56,26 +56,11 @@ graph_path_for_project() {
 if [[ "$1" == "build" ]]; then
   graph_path="$(graph_path_for_project "$@")"
   incremental="false"
-  profile=""
   for arg in "$@"; do
     if [[ "$arg" == "--incremental" ]]; then
       incremental="true"
     fi
   done
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --profile)
-        profile="$2"
-        shift 2
-        ;;
-      *)
-        shift
-        ;;
-    esac
-  done
-  if [[ "$incremental" != "true" && "$profile" == "small" && "\${UA_BUILD_MODE_OVERRIDE:-}" != "full" ]]; then
-    incremental="true"
-  fi
   if [[ "$incremental" == "true" && -n "$graph_path" && ! -f "$graph_path" ]]; then
     printf 'error: build: incremental requires existing graph; run full build explicitly first: %s\\n' "$graph_path" >&2
     exit 9
@@ -186,7 +171,7 @@ function runScript(args, env) {
   }
 }
 
-// --- Test 1b: clean-state profile bootstrap still succeeds when profile defaults to incremental ---
+// --- Test 1b: clean-state deploy profile bootstrap still succeeds when profile defaults to incremental ---
 {
   const work = makeTmp();
   try {
@@ -200,11 +185,11 @@ function runScript(args, env) {
       UA_PROJECTS_ROOT: projectsRoot,
       HOME: work,
     };
-    const result = runScript(["--no-pull", "--profile", "small"], env);
+    const result = runScript(["--no-pull", "--deploy-profile", "ppe"], env);
     check("profile-bootstrap: exit 0", result.status === 0, `${result.status}\n${result.stderr}`);
     const log = existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
     const firstBuildLine = log.split("\n").find((line) => line.startsWith("build ")) ?? "";
-    check("profile-bootstrap: build keeps profile but omits --incremental", firstBuildLine.includes("--profile small") && !firstBuildLine.includes("--incremental"), log);
+    check("profile-bootstrap: build keeps deploy profile but omits --incremental", firstBuildLine.includes("--deploy-profile ppe") && !firstBuildLine.includes("--incremental") && !firstBuildLine.includes("--profile "), log);
     const nightlyLatest = resolve(stateDir, ".understand-anything", "nightly-latest.json");
     check("profile-bootstrap: nightly-latest.json exists", existsSync(nightlyLatest), nightlyLatest);
     if (existsSync(nightlyLatest)) {
@@ -230,8 +215,8 @@ function runScript(args, env) {
       UA_PROJECTS_ROOT: projectsRoot,
       HOME: work,
     };
-    const first = runScript(["--no-pull", "--profile", "small"], env);
-    const second = runScript(["--no-pull", "--profile", "small"], env);
+    const first = runScript(["--no-pull", "--deploy-profile", "ppe"], env);
+    const second = runScript(["--no-pull", "--deploy-profile", "ppe"], env);
     check("non-git-profile: first exit 0", first.status === 0, `${first.status}\n${first.stderr}`);
     check("non-git-profile: second exit 0", second.status === 0, `${second.status}\n${second.stderr}`);
     const buildLines = (existsSync(logPath) ? readFileSync(logPath, "utf8") : "")
@@ -240,9 +225,35 @@ function runScript(args, env) {
     check("non-git-profile: both runs spawned builds", buildLines.length === 2, buildLines.join("\n"));
     check(
       "non-git-profile: archive-style repos never switch to --incremental",
-      buildLines.every((line) => line.includes("--profile small") && !line.includes("--incremental")),
+      buildLines.every((line) => line.includes("--deploy-profile ppe") && !line.includes("--incremental") && !line.includes("--profile ")),
       buildLines.join("\n"),
     );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+// --- Test 1d: deploy/llm profiles are forwarded to build ---
+{
+  const work = makeTmp();
+  try {
+    const projectsRoot = resolve(work, "projects");
+    const { binDir, logPath } = setupFakeBin(work);
+    setupOneProject(projectsRoot);
+
+    const env = {
+      ...process.env,
+      PATH: `${binDir}:${process.env.PATH}`,
+      UA_PROJECTS_ROOT: projectsRoot,
+      HOME: work,
+    };
+    const result = runScript(["--no-pull", "--deploy-profile", "ppe", "--llm-profile", "traex"], env);
+    check("profiles: exit 0", result.status === 0, `${result.status}\n${result.stderr}`);
+    const log = existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
+    const buildLine = log.split("\n").find((line) => line.startsWith("build ")) ?? "";
+    check("profiles: build got deploy profile", buildLine.includes("--deploy-profile ppe"), buildLine);
+    check("profiles: build got llm profile", buildLine.includes("--llm-profile traex"), buildLine);
+    check("profiles: build does not get legacy profile", !buildLine.includes("--profile "), buildLine);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
@@ -276,6 +287,38 @@ function runScript(args, env) {
       "second: stdout reports skipped",
       result.stdout.includes("skipped"),
       result.stdout,
+    );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+// --- Test 2b: repeated unchanged runs keep skipping (no every-other rebuild) ---
+{
+  const work = makeTmp();
+  try {
+    const projectsRoot = resolve(work, "projects");
+    const { binDir, logPath } = setupFakeBin(work);
+    setupOneProject(projectsRoot);
+
+    const env = {
+      ...process.env,
+      PATH: `${binDir}:${process.env.PATH}`,
+      UA_PROJECTS_ROOT: projectsRoot,
+      HOME: work,
+    };
+    runScript(["--no-pull"], env); // first: builds
+    runScript(["--no-pull"], env); // second: skips (writes overallStatus=skipped)
+    const third = runScript(["--no-pull"], env); // third: must still skip
+    check("skip-guard: third exit 0", third.status === 0, third.stderr);
+    check("skip-guard: third run reports skipped", third.stdout.includes("skipped"), third.stdout);
+    const buildLines = readFileSync(logPath, "utf8")
+      .split("\n")
+      .filter((line) => line.startsWith("build "));
+    check(
+      "skip-guard: build only ran once across three unchanged runs",
+      buildLines.length === 1,
+      buildLines.join("\n"),
     );
   } finally {
     rmSync(work, { recursive: true, force: true });
@@ -452,9 +495,9 @@ function runScript(args, env) {
   }
 }
 
-// --- Test 10/10a/11/12 removed: LLM flags / --llm-profile / record sinks /
+// --- Test 10/10a/11/12 removed: low-level LLM flags / record sinks /
 // --print-deploy-context are no longer CLI surface; they live in deploy.yaml
-// under profiles.<name>.build.* / providers.llm / record.*.
+// under deployProfiles.*.build / llmProfiles.* / record.*.
 
 // --- Test 13: discovery failure exits non-zero and does not write an empty aggregate ---
 {

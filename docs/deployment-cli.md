@@ -2,7 +2,7 @@
 
 部署所需要的所有命令、参数、YAML 字段在本文一站收口。原则：
 
-1. **CLI 只暴露拓扑 / 救急开关**：host/port/project/profile/dry-run 这类一眼能看出"按场景调整"的字段。
+1. **CLI 只暴露拓扑 / 救急开关**：host/port/project/deploy-profile/llm-profile/dry-run 这类一眼能看出"按场景调整"的字段。
 2. **其他全部走 YAML / env**：LLM、record 接入、providers、retry 策略、worksheet 等 — 调一次 yaml 写到 `deploy.yaml`，从此不再翻 CLI。
 3. **每台机器固定一份身份**：`~/.env` 写 `UA_DEPLOY_PROFILE=prod|ppe|dev`，CLI 只在临时换身份时显式覆盖。
 
@@ -29,12 +29,20 @@ deploy:
 gateway:
   retain: 3                  # gateway publish 时保留多少非保护 release
 
-providers:
-  llm:
-    package: "<your-llm-provider-package>"
+llmProfiles:
+  traex:
+    package: "<your-trae-cli-v2-provider-package>"
     config:
+      command: "traex"
       model: "<your-model>"
-      modelCandidates: ["small", "large"]
+      modelArg: "-m"
+  traecli:
+    package: "<your-trae-cli-v1-provider-package>"
+    config:
+      command: "traecli"
+      model: "<your-model>"
+
+providers:
   auth:        { package: "...", config: {...} }
   orgPolicy:   { package: "...", config: {...} }
   portalAssets:{ package: "...", config: {...} }
@@ -48,22 +56,25 @@ record:
         nightly: "nightly-update"
         project: "project-update"
 
-profiles:
-  large:
-    use: [llm]
+deployProfiles:
+  ppe:
+    build:
+      mode: "full"
+      excludeTests: true
+      llmAnalysis: true
+      llmRequired: false
+      llmModelCandidates: ["small"]
+      llmRetry: { maxAttempts: 2, initialBackoffMs: 300, maxBackoffMs: 10000 }
+  prod:
     build:
       mode: "incremental"
       excludeTests: true
       llmAnalysis: true
       llmRequired: false
+      llmModelCandidates: ["large"]
       llmRetry: { maxAttempts: 3, initialBackoffMs: 500, maxBackoffMs: 30000 }
-  small:
-    use: [llm]
-    build:
-      mode: "incremental"
-      excludeTests: true
-      llmAnalysis: true
-      llmRetry: { maxAttempts: 2, initialBackoffMs: 300, maxBackoffMs: 10000 }
+
+profiles:
   sso-portal:
     portal: true
     projectRoute: true
@@ -92,7 +103,7 @@ profiles:
 ```bash
 scripts/daily-update.sh \
   --host 0.0.0.0 --port 18666 \
-  --profile large
+  --deploy-profile prod --llm-profile traex
 ```
 
 `UA_DEPLOY_PROFILE` 已在 `~/.env` 配好，不需要再传 `--deploy-profile`。
@@ -102,7 +113,7 @@ scripts/daily-update.sh \
 ```bash
 scripts/daily-update.sh \
   --project mini-project \
-  --profile small \
+  --deploy-profile ppe --llm-profile traex \
   --no-self-update
 ```
 
@@ -111,7 +122,7 @@ scripts/daily-update.sh \
 ```bash
 scripts/nightly-project-sync.sh \
   --project mini-project \
-  --profile small \
+  --deploy-profile ppe --llm-profile traex \
   --no-pull
 ```
 
@@ -122,7 +133,7 @@ tail -F $UA_PROJECTS_ROOT/projects/mini-project/.understand-anything/nightly-run
 ### 1.4 救急：跳 self-update 或 git pull
 
 ```bash
-scripts/daily-update.sh --profile large --no-self-update --no-pull
+scripts/daily-update.sh --deploy-profile prod --llm-profile traex --no-self-update --no-pull
 ```
 
 ### 1.5 救急：手动重挂 shared gateway（不跑 build）
@@ -130,7 +141,7 @@ scripts/daily-update.sh --profile large --no-self-update --no-pull
 ```bash
 scripts/refresh-prod-server.sh \
   --host 0.0.0.0 --port 18666 \
-  --profile large
+  --deploy-profile prod
 ```
 
 ### 1.6 救急：单项目重建 dashboard-dist 后再挂
@@ -141,7 +152,7 @@ understand-anyway dashboard build-dist \
   --plugin-root $UA_PLUGIN_ROOT \
   --rebuild-dashboard
 
-scripts/refresh-prod-server.sh --profile large
+scripts/refresh-prod-server.sh --deploy-profile prod
 ```
 
 ### 1.7 新机首次 bootstrap
@@ -151,7 +162,7 @@ echo 'UA_DEPLOY_PROFILE=ppe' >> ~/.env
 echo 'UA_PROJECTS_ROOT=...'   >> ~/.env
 echo 'UA_PLUGIN_ROOT=...'     >> ~/.env
 
-scripts/daily-update.sh --profile small --no-pull
+scripts/daily-update.sh --deploy-profile ppe --llm-profile traex --no-pull
 ```
 
 首次 clean state 不需要先手工跑一次 full build：`nightly-project-sync.sh`
@@ -195,9 +206,9 @@ understand-anyway repair llm-graph-failures --project <id>
 
 ```bash
 npm install @understand-anyway/cli          # 或 pnpm add / yarn add
-understand-anyway ops daily-update          --project <id> --profile small --deploy-profile ppe
-understand-anyway ops nightly-project-sync  --project <id> --profile small
-understand-anyway ops refresh-prod-server   --profile small
+understand-anyway ops daily-update          --project <id> --deploy-profile ppe --llm-profile traex
+understand-anyway ops nightly-project-sync  --project <id> --deploy-profile ppe --llm-profile traex
+understand-anyway ops refresh-prod-server   --deploy-profile ppe
 ```
 
 - 可用脚本：`daily-update`、`nightly-project-sync`、`refresh-prod-server`。参数与
@@ -218,8 +229,8 @@ understand-anyway ops refresh-prod-server   --profile small
 | `--host <addr>` | `127.0.0.1` | 改绑定地址 | `deploy.host` |
 | `--port <num>` | `18666` | 改端口 | `deploy.port` |
 | `--project <id>` | 全部 | 调试单项目 | — |
-| `--profile <name>` | 不指定 | 选 yaml profile | — |
 | `--deploy-profile <p>` | `$UA_DEPLOY_PROFILE` | 临时换身份；值 `prod\|ppe\|dev` | `~/.env` |
+| `--llm-profile <name>` | 不指定 | 选 `llmProfiles.<name>` | — |
 | `--plugin-root <path>` | `$UA_PLUGIN_ROOT` | 临时切上游版本 | env |
 | `--no-self-update` | 关 | 救急跳 self-update | — |
 | `--no-pull` | 关 | 救急跳项目 git pull | — |
@@ -230,7 +241,8 @@ understand-anyway ops refresh-prod-server   --profile small
 | 参数 | 默认 | 何时用 |
 |------|------|--------|
 | `--project <id>` | 全部 | 调试单项目 |
-| `--profile <name>` | 不指定 | 选 yaml profile |
+| `--deploy-profile <p>` | 不指定 | 选 `deployProfiles.<p>.build` |
+| `--llm-profile <name>` | 不指定 | 选 `llmProfiles.<name>` |
 | `--no-pull` | 关 | 救急跳 git pull |
 | `--dry-run` | 关 | 调试 |
 
@@ -242,7 +254,6 @@ understand-anyway ops refresh-prod-server   --profile small
 | `--port <num>` | `18666` | 改端口 |
 | `--project <id>` | 全部 | 单项目刷新 |
 | `--deploy-profile <p>` | `$UA_DEPLOY_PROFILE` | 临时换身份；拒绝 `dev` |
-| `--profile <name>` | 不指定 | 选 yaml profile（forwarded as `--serve-profile`） |
 | `--plugin-root <path>` | env | 当 dashboard-dist 不存在时需要 |
 | `--dry-run` | 关 | 调试 |
 
@@ -255,7 +266,7 @@ understand-anyway ops refresh-prod-server   --profile small
 ### 3.1 高频
 ```bash
 understand-anyway init <repo> [--project <id>] [--repo-path <tmpl>] [--icon-file <path>]
-understand-anyway build --project <id> [--plugin-root <dir>] [--profile <name>] [--incremental]
+understand-anyway build --project <id> [--plugin-root <dir>] [--deploy-profile <p>] [--llm-profile <name>] [--incremental]
 understand-anyway dashboard build-dist --project <id> --plugin-root <dir> [--rebuild-dashboard]
 understand-anyway dashboard start --project <id> --host <h> --port <p> [--no-open]
 understand-anyway dashboard stop --project <id>
@@ -288,16 +299,18 @@ understand-anyway serve --project <id>   # 前台 serve，不走 daemon
 | CLI 参数 | YAML 字段 | 备注 |
 |----------|-----------|------|
 | `--host` / `--port` | `deploy.host` / `deploy.port` | CLI 临时覆盖 |
-| `--profile <n>` | 选 `profiles.<n>` | 同义 `--serve-profile` 用于 `dashboard start` |
-| `--deploy-profile` | `~/.env UA_DEPLOY_PROFILE` | env 必配，CLI 临时覆盖 |
+| `--deploy-profile <p>` | `deployProfiles.<p>.build` | ppe=small，prod=large |
+| `--llm-profile <n>` | `llmProfiles.<n>` | 选择 traex / traecli 等 LLM provider |
+| `UA_DEPLOY_PROFILE` | `~/.env UA_DEPLOY_PROFILE` | env 必配，CLI 可用 `--deploy-profile` 临时覆盖 |
 | `--plugin-root` | `~/.env UA_PLUGIN_ROOT` | env 兜底，CLI 临时覆盖 |
-| `--output-language` | `deploy.outputLanguage` / `profiles.<n>.build.outputLanguage` | CLI 临时覆盖 |
+| `--output-language` | `deploy.outputLanguage` / `deployProfiles.<n>.build.outputLanguage` | CLI 临时覆盖 |
 
 **完全 yaml-only** 字段（不在任何 sh 脚本暴露）：
 - `gateway.retain`
-- `providers.{auth,orgPolicy,portalAssets,llm,embedding}.{package,config}`
+- `providers.{auth,orgPolicy,portalAssets,embedding}.{package,config}`
+- `llmProfiles.<n>.{package,config}`
 - `record.providers / record.config.<provider>.*`
-- `profiles.<n>.build.{mode,excludeTests,outputLanguage,llmAnalysis,llmRequired,llmRetry.*}`
+- `deployProfiles.<n>.build.{mode,excludeTests,outputLanguage,llmAnalysis,llmRequired,llmModelCandidates,llmRetry.*}`
 - `profiles.<n>.{portal,projectRoute,registry,use}`
 
 ---
@@ -323,7 +336,7 @@ understand-anyway serve --project <id>   # 前台 serve，不走 daemon
 ## 6. 设计原则备忘
 
 - **不允许 auto-detect**：deploy profile 必须显式声明（CLI 或 env），SSH-based heuristics 已废弃。
-- **不允许 deprecated alias**：旧的 `--feishu-sheet` / `--llm-profile` / `--all-builds` / `--restart-gateway` / `--print-deploy-context` 全部移除。
+- **不允许 deprecated alias**：旧的 `--profile`（脚本 build 规格）/ `--feishu-sheet` / `--all-builds` / `--restart-gateway` / `--print-deploy-context` 全部移除。
 - **不允许 LLM/record 走 CLI**：所有 LLM provider、retry policy、record sink 配置只接受 yaml。
 - **不允许通过 sh 脚本暴露 full/resume mode 开关**：nightly 默认走
   `--incremental --exclude-tests`；若 state root 尚无 graph（如新机首次

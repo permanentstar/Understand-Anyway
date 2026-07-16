@@ -30,6 +30,7 @@ describe("parseWorkerArgs", () => {
       pluginRoot: null,
       llmAnalysis: false,
       llmProvider: null,
+      llmProfile: null,
       llmModelCandidates: [],
       llmRequired: false,
       llmTimeoutMs: null,

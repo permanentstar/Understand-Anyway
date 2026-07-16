@@ -19,7 +19,7 @@ import { buildProjectSourceMirrorPath, readProjectVersionState } from "@understa
 import type { BuildArgs } from "./args.js";
 import { resolveBuildConfig, type ResolvedBuildOptions } from "./build-config.js";
 import { buildEmbeddingProvider } from "./build-embedding.js";
-import { buildLlmProvider } from "./build-llm.js";
+import { buildLlmProvider, resolveLlmProfile } from "./build-llm.js";
 import { CLI_ENTRY } from "./cli-entry.js";
 import { loadResolvedConfig } from "./config/load.js";
 import { resolveProjectContext } from "./project-context.js";
@@ -53,12 +53,14 @@ function assertDirectory(path: string, label: string): void {
  */
 function buildLlmWorkerArgs(
   providerPackageName: string | null,
+  llmProfileName: string | null,
   resolved: ResolvedBuildOptions,
   configPath: string | null,
 ): string[] {
   if (!resolved.llmAnalysis) return [];
   const argv: string[] = ["--llm-analysis"];
   if (configPath) argv.push("--config", configPath);
+  if (llmProfileName) argv.push("--llm-profile", llmProfileName);
   if (providerPackageName) argv.push("--llm-provider", providerPackageName);
   if (resolved.llmModelCandidates.length > 0) {
     argv.push("--llm-model-candidates", resolved.llmModelCandidates.join(","));
@@ -113,7 +115,9 @@ export async function runBuild(args: BuildArgs, options: RunBuildOptions = {}): 
     env: process.env,
   });
   const resolved = resolveBuildConfig(args, config);
-  const llmProviderPackageName = args.llmProvider ?? config.providers?.llm?.package ?? null;
+  const llmProfile = args.llmProfile ? resolveLlmProfile(config, args.llmProfile) : null;
+  const llmConfig = llmProfile?.config ?? config;
+  const llmProviderPackageName = args.llmProvider ?? llmProfile?.packageName ?? config.providers?.llm?.package ?? null;
   const embeddingPackageName = args.embeddingProvider ?? config.providers?.embedding?.package ?? null;
 
   log(`resolving upstream plugin${resolved.pluginRoot ? ` (--plugin-root ${resolved.pluginRoot})` : ""}`);
@@ -127,8 +131,8 @@ export async function runBuild(args: BuildArgs, options: RunBuildOptions = {}): 
   const llmProvider = resolved.llmAnalysis
     ? await loadLlmProvider({
         enabled: true,
-          packageName: llmProviderPackageName,
-        config,
+        packageName: llmProviderPackageName,
+        config: llmConfig,
       })
     : undefined;
   const embeddingProvider = embeddingPackageName
@@ -167,6 +171,7 @@ export async function runBuild(args: BuildArgs, options: RunBuildOptions = {}): 
     cliEntry,
     llmWorkerArgs: buildLlmWorkerArgs(
       llmProviderPackageName,
+      args.llmProfile,
       resolved,
       effectiveConfigPath && existsSync(effectiveConfigPath) ? effectiveConfigPath : null,
     ),

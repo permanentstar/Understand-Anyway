@@ -19,6 +19,8 @@ import { formatSchemaErrors, validateDeployConfig, type DeployConfigValidation }
 export interface LoadResolvedConfigArgs extends Pick<ServeArgs, "config"> {
   /** True only when the user explicitly passed --config. Derived default paths stay optional. */
   configExplicit?: boolean;
+  /** Optional deployment profile selector; falls back to UA_DEPLOY_PROFILE when omitted. */
+  deployProfile?: string | null;
 }
 
 export interface LoadConfigDeps {
@@ -74,7 +76,20 @@ export function loadResolvedConfig(args: LoadResolvedConfigArgs, deps: LoadConfi
   }
 
   const dotenv = deps.dotenv ?? loadDotenv({ cwd, fileExists, readFile });
-  return interpolate(parsed, { env, dotenv, readFile }) as ResolvedConfig;
+  const config = interpolate(parsed, { env, dotenv, readFile }) as ResolvedConfig;
+  return applyDeployProfile(config, args.deployProfile ?? env.UA_DEPLOY_PROFILE ?? null);
+}
+
+function applyDeployProfile(config: ResolvedConfig, name: string | null): ResolvedConfig {
+  const profileName = name?.trim();
+  if (!profileName) return config;
+  const profile = config.deployProfiles?.[profileName];
+  if (!profile) throw new ArgsError(`unknown --deploy-profile: ${profileName}`);
+  return {
+    ...config,
+    deploy: profile.deploy ? { ...config.deploy, ...profile.deploy } : config.deploy,
+    gateway: profile.gateway ? { ...config.gateway, ...profile.gateway } : config.gateway,
+  };
 }
 
 /** Resolve the selected serve profile; throws when a named profile is missing. */

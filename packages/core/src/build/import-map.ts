@@ -6,10 +6,10 @@
  */
 
 import { readFileSync as nodeReadFileSync, writeFileSync as nodeWriteFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import {
   buildQualifiedSourceIndex,
-  resolveInternalImportTarget,
+  resolveInternalImportTargets,
   type ImportFsDeps,
 } from "./imports.js";
 import type { BuildLog } from "./scan.js";
@@ -28,6 +28,103 @@ export interface AugmentImportMapOptions {
   log: BuildLog;
 }
 
+function addMultiMapValue(index: Map<string, string[]>, key: string, value: string): void {
+  if (!key || !value) return;
+  const existing = index.get(key);
+  if (existing) {
+    if (!existing.includes(value)) existing.push(value);
+    return;
+  }
+  index.set(key, [value]);
+}
+
+function parseQuotedList(value: string): string[] {
+  const out: string[] = [];
+  const regex = /['"]([^'"]+)['"]/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(String(value || "")))) {
+    if (match[1]) out.push(match[1]);
+  }
+  return out;
+}
+
+function buildPythonPackageRootIndex(
+  analysisRoot: string,
+  files: Array<Record<string, any>>,
+  read: (path: string, encoding: "utf8") => string,
+): Map<string, string[]> {
+  const index = new Map<string, string[]>();
+  const normalizedFiles = new Set(
+    files
+      .map((file) => String(file?.path || "").replace(/\\/g, "/"))
+      .filter(Boolean),
+  );
+  const pyprojectPaths = [...normalizedFiles].filter((filePath) => /(?:^|\/)pyproject\.toml$/i.test(filePath));
+
+  for (const pyprojectPath of pyprojectPaths) {
+    const projectDir = dirname(pyprojectPath).replace(/\\/g, "/");
+    try {
+      const pyprojectContent = read(join(analysisRoot, pyprojectPath), "utf8");
+      const packagesMatch = pyprojectContent.match(/\[tool\.hatch\.build\.targets\.wheel\][\s\S]*?packages\s*=\s*\[([\s\S]*?)\]/m);
+      for (const pkg of parseQuotedList(packagesMatch?.[1] || "")) {
+        const normalized = pkg.replace(/\\/g, "/").replace(/^\.?\//, "").replace(/\/+/g, "/");
+        if (!normalized || normalized.includes("..")) continue;
+        const packageRoot = projectDir === "." ? normalized : `${projectDir}/${normalized}`.replace(/\/+/g, "/");
+        if (normalizedFiles.has(`${packageRoot}/__init__.py`)) {
+          addMultiMapValue(index, basename(normalized), packageRoot);
+        }
+      }
+    } catch {
+      // best-effort only
+    }
+
+    for (const filePath of normalizedFiles) {
+      if (!filePath.endsWith("/__init__.py")) continue;
+      const packageRoot = dirname(filePath).replace(/\\/g, "/");
+      if (projectDir && projectDir !== "." && !packageRoot.startsWith(`${projectDir}/`)) continue;
+      const relativeToProject = projectDir && projectDir !== "."
+        ? packageRoot.slice(projectDir.length + 1)
+        : packageRoot;
+      if (!relativeToProject || relativeToProject.includes("/")) continue;
+      addMultiMapValue(index, basename(packageRoot), packageRoot);
+    }
+  }
+
+  return index;
+}
+
+function parsePythonFallbackImports(content: string): Array<{ source: string; specifiers: string[] }> {
+  const imports: Array<{ source: string; specifiers: string[] }> = [];
+  const lines = String(content || "").split(/\r?\n/);
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/#.*$/, "").trim();
+    if (!line) continue;
+    const fromMatch = line.match(/^from\s+([.\w]+)\s+import\s+(.+)$/);
+    if (fromMatch) {
+      const source = fromMatch[1]?.trim();
+      if (!source || source === "__future__") continue;
+      const specifiers = String(fromMatch[2] || "")
+        .replace(/[()]/g, " ")
+        .split(",")
+        .map((entry) => entry.trim().split(/\s+as\s+/i)[0]?.trim())
+        .filter(Boolean) as string[];
+      imports.push({ source, specifiers });
+      continue;
+    }
+    const importMatch = line.match(/^import\s+(.+)$/);
+    if (importMatch) {
+      const modules = String(importMatch[1] || "")
+        .split(",")
+        .map((entry) => entry.trim().split(/\s+as\s+/i)[0]?.trim())
+        .filter(Boolean) as string[];
+      for (const source of modules) {
+        imports.push({ source, specifiers: [] });
+      }
+    }
+  }
+  return imports;
+}
+
 export function augmentScanResultWithImportMap(
   options: AugmentImportMapOptions,
   deps: ImportMapFsDeps = {},
@@ -39,6 +136,8 @@ export function augmentScanResultWithImportMap(
   const importMap: Record<string, string[]> = {};
   const files = Array.isArray(scan.files) ? (scan.files as Array<Record<string, any>>) : [];
   const qualifiedSourceIndex = buildQualifiedSourceIndex(files);
+  const fileSet = new Set(files.map((file) => String(file?.path || "").replace(/\\/g, "/")).filter(Boolean));
+  const pythonPackageRootIndex = buildPythonPackageRootIndex(analysisRoot, files, read);
   let importFiles = 0;
 
   for (const file of files) {
@@ -56,15 +155,47 @@ export function augmentScanResultWithImportMap(
       : [];
     const targets: string[] = [];
     for (const entry of resolved) {
-      const internal = resolveInternalImportTarget(
+      const internalTargets = resolveInternalImportTargets(
         projectRoot,
         analysisRoot,
         entry.resolvedPath || entry.source,
         qualifiedSourceIndex,
         deps,
+        {
+          language: file.language,
+          importerPath: file.path,
+          specifiers: entry.specifiers || [],
+          pythonPackageRootIndex,
+          fileSet,
+        },
       );
-      if (internal && internal !== file.path) {
-        targets.push(internal);
+      for (const internal of internalTargets) {
+        if (internal && internal !== file.path) {
+          targets.push(internal);
+        }
+      }
+    }
+    if (file.language === "python") {
+      for (const entry of parsePythonFallbackImports(content)) {
+        const internalTargets = resolveInternalImportTargets(
+          projectRoot,
+          analysisRoot,
+          entry.source,
+          qualifiedSourceIndex,
+          deps,
+          {
+            language: "python",
+            importerPath: file.path,
+            specifiers: entry.specifiers,
+            pythonPackageRootIndex,
+            fileSet,
+          },
+        );
+        for (const internal of internalTargets) {
+          if (internal && internal !== file.path) {
+            targets.push(internal);
+          }
+        }
       }
     }
     importMap[file.path] = [...new Set(targets)].sort((a, b) => a.localeCompare(b));

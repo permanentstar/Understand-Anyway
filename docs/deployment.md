@@ -131,15 +131,15 @@ Understand-Anyway 同时保留 flat 命令和动词族子命令。
 
 | 场景 | 推荐 | 不推荐 | 原因 |
 |------|------|--------|------|
-| nightly 构建模板 | `build --profile nightly` | `build --nightly` | nightly 是参数组合，不是新动作 |
-| 临时降并发 | `build --profile nightly --mapper-concurrency 1` | 新增 `debug-low-concurrency` profile | 一次性 override 应放 CLI flag |
+| nightly 构建模板 | `build --deploy-profile prod --llm-profile traex` | `build --nightly` | nightly 是参数组合，不是新动作 |
+| 临时降并发 | `build --deploy-profile prod --mapper-concurrency 1` | 新增 `debug-low-concurrency` profile | 一次性 override 应放 CLI flag |
 | rollback | `gateway rollback` | `--profile rollback` | rollback 是动作，必须是子命令 |
 | 开 portal + 鉴权 | `serve --serve-profile sso-portal` | 新 flat 命令 `serve-sso` | 这是 serve 参数组合 |
-| 受控 LLM 修复 | `repair llm-failures --project <id>` | `build --profile repair-llm` | 修复不是 build 模板 |
+| 受控 LLM 修复 | `repair llm-failures --project <id>` | `build --deploy-profile repair-llm` | 修复不是 build 模板 |
 
 ## 6. 调度脚本三件套
 
-三件套都是**编排器**，本身不带 LLM / record / provider 配置开关，只透传 CLI 拓扑参数（host/port/project/profile/plugin-root/dry-run）。所有业务配置走 deploy.yaml。具体参数表见 [deployment-cli.md §2](./deployment-cli.md)。
+三件套都是**编排器**，只透传拓扑和 profile 选择参数（host/port/project/deploy-profile/llm-profile/plugin-root/dry-run）。provider 细节、record、retry 策略走 deploy.yaml。具体参数表见 [deployment-cli.md §2](./deployment-cli.md)。
 
 ```
 daily-update.sh
@@ -221,7 +221,8 @@ repair 是**人工触发的受控路径**，永远不属于 nightly 主链路：
 | 需求 | 落点 |
 |------|------|
 | 新增一次性动作（改资源状态） | 已有动词族的子命令 |
-| 新增可复用环境模板 | `deploy.yaml profiles.<name>` |
+| 新增可复用部署环境 | `deploy.yaml deployProfiles.<name>` |
+| 新增可复用 LLM provider | `deploy.yaml llmProfiles.<name>` |
 | 新增本次调用的一次性参数 | flat 命令的 CLI flag |
 | 新增机器固定身份 / 默认值 | `UA_*` env（在 `~/.env`），并在 schema 显式声明 |
 | 新增外部系统接入 | provider 包名 + `deploy.yaml providers.*`，不入开源代码 |

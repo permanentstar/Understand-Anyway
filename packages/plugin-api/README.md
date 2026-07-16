@@ -152,7 +152,7 @@ pre-1.0:
 - Breaking changes (renamed methods, required new fields, removed exports)
   ship as `major` and are called out in the GitHub Release notes.
 
-All six packages in this monorepo are versioned together (manual lockstep via
+All ten packages in this monorepo are versioned together (manual lockstep via
 `scripts/release.mjs`), so any bump moves every package — including this one.
 
 ## License

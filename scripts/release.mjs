@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Manual lockstep release for the six `@understand-anyway/*` packages.
+// Manual lockstep release for the ten `@understand-anyway/*` packages.
 //
 // Usage:
 //   node scripts/release.mjs <patch|minor|major|X.Y.Z> [--dry-run] [--skip-git] [--skip-publish] [--registry <url>]
 //
 // Execution order (chosen for recoverability: commit/tag locally before the
 // irreversible npm publish, push to the remote only after npm succeeds):
-//   1. Sanity: valid bump, six packages in lockstep, clean tree for real
+//   1. Sanity: valid bump, ten packages in lockstep, clean tree for real
 //      execution, on `main` and synced with `origin/main` (unless --skip-git),
 //      target versions absent from the registry, `npm whoami` succeeds for
 //      public npm publishes (unless --skip-publish).
@@ -35,7 +35,18 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const PKG_NAMES = ["plugin-api", "core", "gateway", "provider-feishu-auth", "provider-feishu-sheets", "cli"];
+const PKG_NAMES = [
+  "plugin-api",
+  "core",
+  "gateway",
+  "provider-cli-runtime",
+  "provider-feishu-auth",
+  "provider-feishu-sheets",
+  "provider-lark-im-notify",
+  "provider-trae-cli-v1",
+  "provider-trae-cli-v2",
+  "cli",
+];
 const PKG_PATHS = PKG_NAMES.map((name) => resolve(REPO_ROOT, "packages", name, "package.json"));
 const SEMVER_CORE_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 

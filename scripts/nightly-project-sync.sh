@@ -35,7 +35,8 @@ build automatically. Build/serve options live in deploy.yaml.
 
 Options:
   --project <id>          Sync only one projectId. Default: all visible.
-  --profile <name>        Build profile (deploy.yaml profiles.*).
+  --deploy-profile <p>    Build spec profile (deploy.yaml deployProfiles.*).
+  --llm-profile <name>    LLM provider profile (deploy.yaml llmProfiles.*).
   --no-pull               Skip git pull. Default: pull runs.
   --dry-run               Print commands; do not spawn understand-anyway.
   -h, --help              Show this help.
@@ -43,7 +44,8 @@ EOF
 }
 
 project_filter=""
-profile=""
+deploy_profile=""
+llm_profile=""
 no_pull="false"
 dry_run="false"
 
@@ -54,9 +56,14 @@ while [[ $# -gt 0 ]]; do
       project_filter="$2"
       shift 2
       ;;
-    --profile)
+    --deploy-profile)
       require_value "$1" "${2:-}"
-      profile="$2"
+      deploy_profile="$2"
+      shift 2
+      ;;
+    --llm-profile)
+      require_value "$1" "${2:-}"
+      llm_profile="$2"
       shift 2
       ;;
     --no-pull)
@@ -78,6 +85,10 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ -n "$deploy_profile" ]]; then
+  export UA_DEPLOY_PROFILE="$deploy_profile"
+fi
 
 UA_DRY_RUN="$dry_run"
 export UA_DRY_RUN
@@ -179,8 +190,11 @@ spawn_build() {
   if can_run_incremental_build "$repo_path" "$state_dir"; then
     cmd+=(--incremental)
   fi
-  if [[ -n "$profile" ]]; then
-    cmd+=(--profile "$profile")
+  if [[ -n "$deploy_profile" ]]; then
+    cmd+=(--deploy-profile "$deploy_profile")
+  fi
+  if [[ -n "$llm_profile" ]]; then
+    cmd+=(--llm-profile "$llm_profile")
   fi
   if can_run_incremental_build "$repo_path" "$state_dir"; then
     run_or_print "${cmd[@]}"
@@ -238,9 +252,12 @@ while IFS= read -r line; do
   prev_commit="$(read_previous_commit "$state_dir")"
   prev_status="$(read_previous_overall_status "$state_dir")"
 
-  # 2. commit gate: same commit + previous success → skipped
-  if [[ -n "$current_commit" && "$current_commit" == "$prev_commit" && "$prev_status" == "success" ]]; then
-    printf '[nightly-project-sync] project=%s commit=%s skipped (no change since previous success)\n' "$project_id" "${current_commit:0:12}"
+  # 2. commit gate: same commit + previous usable run → skipped. A prior
+  # `skipped` already proves the current commit is covered, so keep skipping
+  # instead of rebuilding every other run.
+  if [[ -n "$current_commit" && "$current_commit" == "$prev_commit" \
+        && ( "$prev_status" == "success" || "$prev_status" == "skipped" ) ]]; then
+    printf '[nightly-project-sync] project=%s commit=%s skipped (no change since previous usable run)\n' "$project_id" "${current_commit:0:12}"
     PROJECT_NAME="$project_id" REPO_PATH="$repo_path" STATE_DIR="$state_dir" \
     COMMIT="$current_commit" RUN_ID="$run_id" \
     STARTED="$project_started_at" FINISHED="$(timestamp_now)" \

@@ -29,20 +29,15 @@
     "@understand-anyway/core": "workspace:*",
     "@understand-anyway/gateway": "workspace:*",
     "@understand-anyway/plugin-api": "workspace:*",
+    "@understand-anyway/provider-feishu-auth": "workspace:*",
+    "@understand-anyway/provider-feishu-sheets": "workspace:*",
+    "@understand-anyway/provider-lark-im-notify": "workspace:*",
+    "@understand-anyway/provider-trae-cli-v1": "workspace:*",
+    "@understand-anyway/provider-trae-cli-v2": "workspace:*",
     "ajv": "^8.17.1",
     "yaml": "^2.4.2"
   },
-  "peerDependencies": {
-    "@understand-anyway/provider-feishu-sheets": "workspace:*"
-  },
-  "peerDependenciesMeta": {
-    "@understand-anyway/provider-feishu-sheets": {
-      "optional": true
-    }
-  },
-  "devDependencies": {
-    "@understand-anyway/provider-feishu-sheets": "workspace:*"
-  },
+  "devDependencies": {},
   "scripts": {
     "build": "tsup src/index.ts src/cli.ts --format esm --dts --clean",
     "prepack": "node scripts/copy-ops-scripts.mjs",

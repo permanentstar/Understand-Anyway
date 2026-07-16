@@ -68,11 +68,11 @@ export UA_RELEASE_GATE_EXTERNAL_PPE_OSS_RELEASE_CMD='node scripts/release-gate-p
 
 - PPE 机器已安装 `traex`
 - `traex login --git-code` 可成功完成
-- 脚本会临时写入一个 `llm` shim，把 `cli-spawn` provider 接到 `traex exec`
+- 脚本会临时写入一个 `llm` shim，把 `@understand-anyway/provider-trae-cli-v2` 接到 `traex exec`
 
 `ppe-oss-release` 验证标准 OSS 安装形态，额外行为：
 
-- 控制端本机 `pnpm -r build` + `pnpm pack` 6 个包（`pnpm pack` 会把
+- 控制端本机 `pnpm -r build` + `pnpm pack` 10 个包（`pnpm pack` 会把
   `workspace:*` 依赖解析成真实版本号；`npm pack` 不会，会导致 publish 报
   `EUNSUPPORTEDPROTOCOL`），再 `scp` 到 PPE 的 `verdaccio-tarballs/`。
 - 部署会话：PPE 本地起 Verdaccio（`setsid` 脱离 ssh channel）→ 写 scoped

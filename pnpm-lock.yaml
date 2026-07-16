@@ -32,16 +32,27 @@ importers:
       '@understand-anyway/plugin-api':
         specifier: workspace:*
         version: link:../plugin-api
+      '@understand-anyway/provider-feishu-auth':
+        specifier: workspace:*
+        version: link:../provider-feishu-auth
+      '@understand-anyway/provider-feishu-sheets':
+        specifier: workspace:*
+        version: link:../provider-feishu-sheets
+      '@understand-anyway/provider-lark-im-notify':
+        specifier: workspace:*
+        version: link:../provider-lark-im-notify
+      '@understand-anyway/provider-trae-cli-v1':
+        specifier: workspace:*
+        version: link:../provider-trae-cli-v1
+      '@understand-anyway/provider-trae-cli-v2':
+        specifier: workspace:*
+        version: link:../provider-trae-cli-v2
       ajv:
         specifier: ^8.17.1
         version: 8.20.0
       yaml:
         specifier: ^2.4.2
         version: 2.9.0
-    devDependencies:
-      '@understand-anyway/provider-feishu-sheets':
-        specifier: workspace:*
-        version: link:../provider-feishu-sheets
 
   packages/core:
     dependencies:
@@ -60,6 +71,8 @@ importers:
 
   packages/plugin-api: {}
 
+  packages/provider-cli-runtime: {}
+
   packages/provider-feishu-auth:
     dependencies:
       '@understand-anyway/plugin-api':
@@ -74,6 +87,24 @@ importers:
         version: 5.0.8
 
   packages/provider-feishu-sheets:
+    dependencies:
+      '@understand-anyway/plugin-api':
+        specifier: workspace:*
+        version: link:../plugin-api
+
+  packages/provider-lark-im-notify:
+    dependencies:
+      '@understand-anyway/plugin-api':
+        specifier: workspace:*
+        version: link:../plugin-api
+
+  packages/provider-trae-cli-v1:
+    dependencies:
+      '@understand-anyway/plugin-api':
+        specifier: workspace:*
+        version: link:../plugin-api
+
+  packages/provider-trae-cli-v2:
     dependencies:
       '@understand-anyway/plugin-api':
         specifier: workspace:*

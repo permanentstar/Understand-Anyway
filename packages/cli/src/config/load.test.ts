@@ -103,6 +103,27 @@ describe("loadResolvedConfig", () => {
     expect((config.providers?.auth?.config as { appSecret: string }).appSecret).toBe("real-secret");
   });
 
+  it("applies deployProfiles to deploy and gateway defaults", () => {
+    const text = `
+version: 1
+deploy:
+  host: 0.0.0.0
+  port: 18666
+gateway:
+  retain: 3
+deployProfiles:
+  ppe:
+    deploy:
+      port: 18690
+      outputLanguage: zh
+    gateway:
+      retain: 2
+`;
+    const config = loadResolvedConfig({ ...serveArgs(), deployProfile: "ppe" }, fakeDeps(text));
+    expect(config.deploy).toMatchObject({ host: "0.0.0.0", port: 18690, outputLanguage: "zh" });
+    expect(config.gateway).toEqual({ retain: 2 });
+  });
+
   it("keeps secrets out of the YAML source (only placeholders in the text)", () => {
     expect(YAML_TEXT).not.toContain("real-secret");
     expect(YAML_TEXT).toContain("{{ FEISHU_APP_SECRET }}");

@@ -30,6 +30,7 @@ export interface WorkerArgs {
   pluginRoot: string | null;
   llmAnalysis: boolean;
   llmProvider: string | null;
+  llmProfile: string | null;
   llmModelCandidates: string[];
   llmRequired: boolean;
   llmTimeoutMs: number | null;
@@ -45,7 +46,7 @@ export interface RunWorkerDeps {
   /** Build the analyzer registry; injected for tests. */
   createRegistry?: typeof createAnalyzerRegistry;
   /** Load an LLM provider by package name; null = no provider. */
-  loadLlmProvider?: (packageName: string, configPath: string | null) => Promise<{
+  loadLlmProvider?: (packageName: string, configPath: string | null, llmProfile?: string | null) => Promise<{
     name: string;
     complete: (request: { prompt: string; timeoutMs?: number }) => Promise<{ text: string }>;
   } | undefined>;
@@ -72,6 +73,7 @@ export function parseWorkerArgs(argv: string[]): WorkerArgs {
   let pluginRoot: string | null = null;
   let llmAnalysis = false;
   let llmProvider: string | null = null;
+  let llmProfile: string | null = null;
   let llmModelCandidates: string[] = [];
   let llmRequired = false;
   let llmTimeoutMs: number | null = null;
@@ -133,6 +135,9 @@ export function parseWorkerArgs(argv: string[]): WorkerArgs {
       case "--llm-provider":
         llmProvider = take();
         break;
+      case "--llm-profile":
+        llmProfile = take();
+        break;
       case "--llm-model-candidates":
         llmModelCandidates = take().split(",").map((entry) => entry.trim()).filter(Boolean);
         break;
@@ -180,6 +185,7 @@ export function parseWorkerArgs(argv: string[]): WorkerArgs {
     pluginRoot,
     llmAnalysis,
     llmProvider,
+    llmProfile,
     llmModelCandidates,
     llmRequired,
     llmTimeoutMs,
@@ -224,7 +230,9 @@ async function maybeLoadLlmProvider(args: WorkerArgs, deps: RunWorkerDeps) {
   if (!deps.loadLlmProvider) {
     throw new ArgsError("worker cannot load --llm-provider: no provider loader injected");
   }
-  const provider = await deps.loadLlmProvider(args.llmProvider, args.config);
+  const provider = args.llmProfile
+    ? await deps.loadLlmProvider(args.llmProvider, args.config, args.llmProfile)
+    : await deps.loadLlmProvider(args.llmProvider, args.config);
   if (!provider) throw new ArgsError(`failed to load LLM provider: ${args.llmProvider}`);
   return provider;
 }

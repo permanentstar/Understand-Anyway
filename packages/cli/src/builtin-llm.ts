@@ -1,30 +1,9 @@
-import { spawn as nodeSpawn, type ChildProcess, type SpawnOptions } from "node:child_process";
 import type { LlmProvider, LlmRequest, LlmResponse } from "@understand-anyway/plugin-api";
 
 type FetchLike = (
   url: string,
   init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: AbortSignal },
 ) => Promise<{ ok: boolean; json(): Promise<unknown> }>;
-
-type SpawnLike = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
-
-export function killSpawnedProcessGroup(
-  child: ChildProcess,
-  signal: NodeJS.Signals,
-  deps: {
-    platform?: NodeJS.Platform;
-    killProcess?: (pid: number, signal: NodeJS.Signals) => void;
-  } = {},
-): void {
-  if (!child.pid) return;
-  const platform = deps.platform ?? process.platform;
-  const killProcess = deps.killProcess ?? ((pid: number, sig: NodeJS.Signals) => process.kill(pid, sig));
-  if (platform !== "win32") {
-    killProcess(-child.pid, signal);
-    return;
-  }
-  child.kill(signal);
-}
 
 export class MockLlmProvider implements LlmProvider {
   readonly name = "mock";
@@ -107,105 +86,6 @@ export class OpenAiCompatibleLlmProvider implements LlmProvider {
   }
 }
 
-async function runCliPrompt(options: {
-  command: string;
-  args: string[];
-  prompt: string;
-  promptMode: "arg" | "stdin";
-  timeoutMs: number;
-  spawnImpl?: SpawnLike;
-}): Promise<string> {
-  const spawnImpl = options.spawnImpl ?? nodeSpawn;
-  return await new Promise<string>((resolve, reject) => {
-    const child = spawnImpl(options.command, options.promptMode === "arg" ? [...options.args, options.prompt] : options.args, {
-      stdio: ["pipe", "pipe", "pipe"],
-      detached: process.platform !== "win32",
-    });
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    const finish = (cb: () => void) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      cb();
-    };
-    const timeout = setTimeout(() => {
-      killSpawnedProcessGroup(child, "SIGTERM");
-      finish(() => reject(new Error(`cli-spawn command timed out after ${options.timeoutMs}ms`)));
-    }, options.timeoutMs);
-    child.stdout?.setEncoding("utf8");
-    child.stderr?.setEncoding("utf8");
-    child.stdout?.on("data", (chunk) => { stdout += chunk; });
-    child.stderr?.on("data", (chunk) => { stderr += chunk; });
-    child.on("error", (error) => finish(() => reject(error)));
-    child.on("exit", (code) => {
-      finish(() => {
-        if (code === 0) resolve(stdout.trim());
-        else reject(new Error(stderr || `cli-spawn command exited with code ${code ?? "unknown"}`));
-      });
-    });
-    if (options.promptMode === "stdin") {
-      child.stdin?.end(options.prompt);
-    } else {
-      child.stdin?.end();
-    }
-  });
-}
-
-const CLI_SPAWN_DEFAULT_MODEL = "cli-spawn-default";
-
-function shouldPassModel(model: string): boolean {
-  const normalized = model.trim();
-  return normalized.length > 0 && normalized !== CLI_SPAWN_DEFAULT_MODEL;
-}
-
-export class CliSpawnLlmProvider implements LlmProvider {
-  readonly name = "cli-spawn";
-  private readonly model: string;
-  private readonly command: string;
-  private readonly args: string[];
-  private readonly modelArg?: string;
-  private readonly promptMode: "arg" | "stdin";
-  private readonly spawnImpl?: SpawnLike;
-
-  constructor(options: {
-    model?: string;
-    command?: string;
-    args?: string[];
-    modelArg?: string;
-    promptMode?: "arg" | "stdin";
-    spawnImpl?: SpawnLike;
-  }) {
-    this.model = options.model ?? CLI_SPAWN_DEFAULT_MODEL;
-    this.command = options.command ?? "llm";
-    this.args = options.args ?? ["-p", "--output-format", "text"];
-    this.modelArg = options.modelArg?.trim() || undefined;
-    this.promptMode = options.promptMode ?? "arg";
-    this.spawnImpl = options.spawnImpl;
-  }
-
-  async complete(request: LlmRequest): Promise<LlmResponse> {
-    const model = request.model ?? this.model;
-    const args = [...this.args];
-    if (this.modelArg && shouldPassModel(model) && !args.includes(this.modelArg)) {
-      args.push(this.modelArg, model);
-    }
-    const text = await runCliPrompt({
-      command: this.command,
-      args,
-      prompt: request.prompt,
-      promptMode: this.promptMode,
-      timeoutMs: request.timeoutMs ?? 30_000,
-      spawnImpl: this.spawnImpl,
-    });
-    return {
-      text,
-      meta: { provider: this.name, model },
-    };
-  }
-}
-
 export function createBuiltinLlmProvider(
   packageName: string | null | undefined,
   config: Record<string, unknown> = {},
@@ -220,16 +100,6 @@ export function createBuiltinLlmProvider(
       apiKey: config.apiKey as string | undefined,
       apiKeyEnv: config.apiKeyEnv as string | undefined,
       fetchImpl: config.fetchImpl as FetchLike | undefined,
-    });
-  }
-  if (name === "cli-spawn") {
-    return new CliSpawnLlmProvider({
-      model: config.model as string | undefined,
-      command: config.command as string | undefined,
-      args: Array.isArray(config.args) ? config.args.filter((item): item is string => typeof item === "string") : undefined,
-      modelArg: config.modelArg as string | undefined,
-      promptMode: config.promptMode === "stdin" ? "stdin" : "arg",
-      spawnImpl: config.spawnImpl as SpawnLike | undefined,
     });
   }
   return undefined;

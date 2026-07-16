@@ -42,8 +42,6 @@ Options:
   --deploy-profile <p>     Override deployment profile (prod|ppe|dev). Default:
                            $UA_DEPLOY_PROFILE in ~/.env. Rejects dev for prod
                            refresh.
-  --profile <name>         Serve profile (deploy.yaml profiles.*) forwarded to
-                           the shared gateway as --serve-profile.
   --plugin-root <path>     Upstream plugin root needed by `dashboard build-dist`
                            when a project's dashboard-dist is missing.
   --dry-run                Print commands; do not spawn understand-anyway.
@@ -61,7 +59,6 @@ host="127.0.0.1"
 port="18666"
 project_filter=""
 deploy_profile_cli=""
-profile=""
 plugin_root=""
 dry_run="false"
 
@@ -71,7 +68,6 @@ while [[ $# -gt 0 ]]; do
     --port)             require_value "$1" "${2:-}"; port="$2"; shift 2 ;;
     --project)          require_value "$1" "${2:-}"; project_filter="$2"; shift 2 ;;
     --deploy-profile)   require_value "$1" "${2:-}"; deploy_profile_cli="$2"; shift 2 ;;
-    --profile)          require_value "$1" "${2:-}"; profile="$2"; shift 2 ;;
     --plugin-root)      require_value "$1" "${2:-}"; plugin_root="$2"; shift 2 ;;
     --dry-run)          dry_run="true"; shift ;;
     --help|-h)          usage; exit 0 ;;
@@ -90,6 +86,7 @@ if [[ "$deploy_profile" == "dev" ]]; then
   printf '[refresh-prod-server] dev deploy profile is not allowed for prod refresh\n' >&2
   exit 2
 fi
+export UA_DEPLOY_PROFILE="$deploy_profile"
 
 UA_DRY_RUN="$dry_run"
 export UA_DRY_RUN
@@ -243,9 +240,6 @@ spawn_shared_gateway() {
       --host "$host"
       --port "$port"
       --no-open)
-  fi
-  if [[ -n "$profile" ]]; then
-    cmd+=(--serve-profile "$profile")
   fi
   run_or_print "${cmd[@]}"
 }
