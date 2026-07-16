@@ -101,9 +101,9 @@ describe("renderPortalPage", () => {
   it("renders the default footer links when none are configured", () => {
     const html = renderPortalPage(baseView());
 
-    expect(html).toContain('href="https://github.com/permanentstar"');
+    expect(html).toContain('href="https://github.com/permanentstar/Understand-Anyway"');
     expect(html).toContain('aria-label="permanentstar"');
-    expect(html).toContain('href="https://github.com/Lum1104/Understand-Anything"');
+    expect(html).toContain('href="https://github.com/Egonex-AI/Understand-Anything"');
     expect(html).toContain('aria-label="Understand-Anything"');
   });
 

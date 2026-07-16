@@ -105,8 +105,8 @@ const PLACEHOLDER_ICON =
   "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2092%2092'%3E%3Crect%20width='92'%20height='92'%20rx='20'%20fill='%23123'/%3E%3Ccircle%20cx='46'%20cy='46'%20r='22'%20fill='none'%20stroke='%235cd4ff'%20stroke-width='4'/%3E%3C/svg%3E";
 
 const DEFAULT_PORTAL_LINKS: PortalLinkView[] = [
-  { name: "permanentstar", href: "https://github.com/permanentstar" },
-  { name: "Understand-Anything", href: "https://github.com/Lum1104/Understand-Anything" },
+  { name: "permanentstar", href: "https://github.com/permanentstar/Understand-Anyway" },
+  { name: "Understand-Anything", href: "https://github.com/Egonex-AI/Understand-Anything" },
 ];
 
 export function renderPortalPage(view: PortalView): string {
