@@ -1,9 +1,43 @@
+scripts/__tests__/aggregate-daily.test.mjs
+  s_4dc68bee55133e::t_2c3ee8779ec02e 35-40,153-186,189-193
+  s_4dc68bee55133e::t_df2ba8d53eb6a3 121-152,187-188
+  s_4dc68bee55133e::t_83d842c6deea12 194
+scripts/__tests__/write-external-records.test.mjs
+  s_4dc68bee55133e::t_95e61c666e7939 31-88,148-157,164-172,279-289,343-345,348,352,355-357,359-360,363,367,371,375
+  s_4dc68bee55133e::t_c05beb7f771178 113-116
+  s_4dc68bee55133e::t_53420da4ed5b5d 8
+packages/provider-feishu-sheets/src/feishu-sheets-client.test.ts
+  s_4dc68bee55133e::t_c3bb6af7b37aec 11,27,43-44,49
+  s_4dc68bee55133e::t_89ab2c2b85b319 48
+  s_4dc68bee55133e::t_9cf82a5ffad061 1-10,12-26,28-42,45-47,50-55
+packages/provider-feishu-sheets/src/feishu-sheets-client.ts
+  s_4dc68bee55133e::t_90f25160864337 42-43,177,179,187-189,252-277
+  s_4dc68bee55133e::t_79137135760d6b 37-41,81,173-175,190,192,196,199,213-231,245-251
+scripts/aggregate-daily.mjs
+  s_4dc68bee55133e::t_268c4b73984fcb 138,141-142,168
+  s_4dc68bee55133e::t_85140f4ec1e0d6 128-130,132,134
+packages/cli/deploy.example.yaml
+  s_4dc68bee55133e::t_639e27c701a75f 35-39
+  s_4dc68bee55133e::t_25431166da1063 85-111
+scripts/write-external-records.mjs
+  s_4dc68bee55133e::t_8bad2eb5826c49 187-188,196,200-205,207-233,249-250,256-261,266-270,274,281-313,319-320,378-387
+  s_4dc68bee55133e::t_f0ff9887c30bfd 333-340
 ---
 {
   "schema_version": "authorship/3.0.0",
   "git_ai_version": "1.6.10",
   "base_commit_sha": "8da8cae63d2d0e1bebadd606563d5727cbd14426",
   "prompts": {},
+  "sessions": {
+    "s_4dc68bee55133e": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a50ab28caac80d00b3e8217",
+        "model": "gpt-5.5__max"
+      },
+      "human_author": "permanentstar <permanent.star@gmail.com>"
+    }
+  },
   "attestation_metadata": {},
   "remote_transcripts": {}
 }
