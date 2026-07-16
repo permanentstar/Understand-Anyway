@@ -34,6 +34,58 @@ function setupFakeBin(workDir, gateOpts = {}) {
   const failed = gateOpts.failed === true ? "true" : "false";
   const shim = `#!/usr/bin/env bash
 { printf '%s\\n' "$*"; } >> "${logPath}"
+graph_path_for_project() {
+  local project=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --project)
+        project="$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  if [[ -z "$project" || -z "\${UA_PROJECTS_ROOT:-}" ]]; then
+    printf ''
+    return
+  fi
+  printf '%s/projects/%s/.understand-anything/knowledge-graph.json' "$UA_PROJECTS_ROOT" "$project"
+}
+if [[ "$1" == "build" ]]; then
+  graph_path="$(graph_path_for_project "$@")"
+  incremental="false"
+  profile=""
+  for arg in "$@"; do
+    if [[ "$arg" == "--incremental" ]]; then
+      incremental="true"
+    fi
+  done
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --profile)
+        profile="$2"
+        shift 2
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+  if [[ "$incremental" != "true" && "$profile" == "small" && "\${UA_BUILD_MODE_OVERRIDE:-}" != "full" ]]; then
+    incremental="true"
+  fi
+  if [[ "$incremental" == "true" && -n "$graph_path" && ! -f "$graph_path" ]]; then
+    printf 'error: build: incremental requires existing graph; run full build explicitly first: %s\\n' "$graph_path" >&2
+    exit 9
+  fi
+  if [[ -n "$graph_path" ]]; then
+    mkdir -p "$(dirname "$graph_path")"
+    printf '%s' '{"nodes":[],"edges":[]}' > "$graph_path"
+  fi
+  exit 0
+fi
 if [[ "$1" == "review-graph-health" ]]; then
   output=""
   while [[ $# -gt 0 ]]; do
@@ -70,14 +122,18 @@ function gitInit(repoDir) {
   spawnSync("git", ["commit", "-q", "-m", "init"], { cwd: repoDir });
 }
 
-function setupOneProject(projectsRoot) {
+function setupOneProject(projectsRoot, options = {}) {
   const cfgDir = resolve(projectsRoot, "gateway", "config");
   mkdirSync(cfgDir, { recursive: true });
   const repoBase = resolve(projectsRoot, "src");
   mkdirSync(repoBase, { recursive: true });
   const repoDir = resolve(repoBase, "alpha");
   mkdirSync(repoDir, { recursive: true });
-  gitInit(repoDir);
+  if (options.gitRepo !== false) {
+    gitInit(repoDir);
+  } else {
+    writeFileSync(resolve(repoDir, "README.md"), "x");
+  }
   writeFileSync(
     resolve(cfgDir, "projects.json"),
     JSON.stringify({
@@ -92,7 +148,7 @@ function runScript(args, env) {
   return spawnSync("bash", [SCRIPT, ...args], { encoding: "utf8", env });
 }
 
-// --- Test 1: first run invokes build, writes nightly-latest.json ---
+// --- Test 1: clean-state first run bootstraps with full build, then writes nightly-latest.json ---
 {
   const work = makeTmp();
   try {
@@ -110,7 +166,8 @@ function runScript(args, env) {
     check("first: exit 0", result.status === 0, `${result.status}\n${result.stderr}`);
     const log = existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
     check("first: build invoked with --project", log.includes("build --project alpha"), log);
-    check("first: --incremental flag", log.includes("--incremental"), log);
+    const firstBuildLine = log.split("\n").find((line) => line.startsWith("build ")) ?? "";
+    check("first: clean-state build omits --incremental", !firstBuildLine.includes("--incremental"), log);
     check("first: --exclude-tests flag", log.includes("--exclude-tests"), log);
     const nightlyLatest = resolve(stateDir, ".understand-anything", "nightly-latest.json");
     check("first: nightly-latest.json exists", existsSync(nightlyLatest), nightlyLatest);
@@ -124,6 +181,68 @@ function runScript(args, env) {
       check("first: gate.criticalCount=0", payload.gate?.criticalCount === 0, JSON.stringify(payload));
       check("first: needsManualIntervention=false", payload.needsManualIntervention === false, JSON.stringify(payload));
     }
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+// --- Test 1b: clean-state profile bootstrap still succeeds when profile defaults to incremental ---
+{
+  const work = makeTmp();
+  try {
+    const projectsRoot = resolve(work, "projects");
+    const { binDir, logPath } = setupFakeBin(work);
+    const { stateDir } = setupOneProject(projectsRoot);
+
+    const env = {
+      ...process.env,
+      PATH: `${binDir}:${process.env.PATH}`,
+      UA_PROJECTS_ROOT: projectsRoot,
+      HOME: work,
+    };
+    const result = runScript(["--no-pull", "--profile", "small"], env);
+    check("profile-bootstrap: exit 0", result.status === 0, `${result.status}\n${result.stderr}`);
+    const log = existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
+    const firstBuildLine = log.split("\n").find((line) => line.startsWith("build ")) ?? "";
+    check("profile-bootstrap: build keeps profile but omits --incremental", firstBuildLine.includes("--profile small") && !firstBuildLine.includes("--incremental"), log);
+    const nightlyLatest = resolve(stateDir, ".understand-anything", "nightly-latest.json");
+    check("profile-bootstrap: nightly-latest.json exists", existsSync(nightlyLatest), nightlyLatest);
+    if (existsSync(nightlyLatest)) {
+      const payload = JSON.parse(readFileSync(nightlyLatest, "utf8"));
+      check("profile-bootstrap: overallStatus=success", payload.overallStatus === "success", JSON.stringify(payload));
+    }
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+// --- Test 1c: non-git repo checkouts keep using full bootstrap builds ---
+{
+  const work = makeTmp();
+  try {
+    const projectsRoot = resolve(work, "projects");
+    const { binDir, logPath } = setupFakeBin(work);
+    setupOneProject(projectsRoot, { gitRepo: false });
+
+    const env = {
+      ...process.env,
+      PATH: `${binDir}:${process.env.PATH}`,
+      UA_PROJECTS_ROOT: projectsRoot,
+      HOME: work,
+    };
+    const first = runScript(["--no-pull", "--profile", "small"], env);
+    const second = runScript(["--no-pull", "--profile", "small"], env);
+    check("non-git-profile: first exit 0", first.status === 0, `${first.status}\n${first.stderr}`);
+    check("non-git-profile: second exit 0", second.status === 0, `${second.status}\n${second.stderr}`);
+    const buildLines = (existsSync(logPath) ? readFileSync(logPath, "utf8") : "")
+      .split("\n")
+      .filter((line) => line.startsWith("build "));
+    check("non-git-profile: both runs spawned builds", buildLines.length === 2, buildLines.join("\n"));
+    check(
+      "non-git-profile: archive-style repos never switch to --incremental",
+      buildLines.every((line) => line.includes("--profile small") && !line.includes("--incremental")),
+      buildLines.join("\n"),
+    );
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
@@ -186,11 +305,18 @@ function runScript(args, env) {
     spawnSync("git", ["commit", "-q", "-m", "second"], { cwd: repoDir });
 
     runScript(["--no-pull"], env);
-    const secondLines = readFileSync(logPath, "utf8").split("\n").filter(Boolean).length;
+    const allLines = readFileSync(logPath, "utf8").split("\n").filter(Boolean);
+    const secondLines = allLines.length;
     check(
       "commit-changed: build re-invoked",
       secondLines === firstLines + 3,
       `before=${firstLines} after=${secondLines}`,
+    );
+    const buildLines = allLines.filter((line) => line.startsWith("build "));
+    check(
+      "commit-changed: follow-up build uses --incremental once graph exists",
+      buildLines[buildLines.length - 1]?.includes("--incremental") === true,
+      buildLines.join("\n"),
     );
   } finally {
     rmSync(work, { recursive: true, force: true });

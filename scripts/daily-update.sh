@@ -265,7 +265,7 @@ fi
 refresh_args=(--host "$host" --port "$port" --deploy-profile "$deploy_profile")
 if [[ -n "$project" ]]; then refresh_args+=(--project "$project"); fi
 if [[ -n "$profile" ]]; then refresh_args+=(--profile "$profile"); fi
-if [[ -n "$plugin_root" ]]; then refresh_args+=(--plugin-root "$plugin_root"); fi
+if [[ -n "$resolved_plugin_root" ]]; then refresh_args+=(--plugin-root "$resolved_plugin_root"); fi
 if [[ "$dry_run" == "true" ]]; then refresh_args+=(--dry-run); fi
 
 stage_begin

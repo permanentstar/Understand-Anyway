@@ -2,9 +2,10 @@
 # scripts/nightly-project-sync.sh
 #
 # Per-project serial sync entrypoint: discover -> git pull -> commit-gate ->
-# `understand_anyway build --incremental` -> `project-state publish` ->
-# graph-health gate -> write project `.understand-anything/nightly-latest.json`
-# and per-project `result.json`.
+# `understand_anyway build` (bootstrap full on clean state, otherwise
+# incremental) -> `project-state publish` -> graph-health gate -> write
+# project `.understand-anything/nightly-latest.json` and per-project
+# `result.json`.
 #
 # OSS-neutral. LLM, record sinks, retry policy, and review hook live in
 # deploy.yaml; this script does not expose CLI flags for them.
@@ -28,8 +29,9 @@ Usage:
   nightly-project-sync.sh [options]
 
 Discovers projects from <projectsRoot>/gateway/config/projects.json and runs each
-through `git pull -> build --incremental -> project-state publish ->
-graph-health gate`. Build/serve options live in deploy.yaml.
+through `git pull -> build -> project-state publish -> graph-health gate`.
+Clean state bootstraps with a full build once; subsequent runs use incremental
+build automatically. Build/serve options live in deploy.yaml.
 
 Options:
   --project <id>          Sync only one projectId. Default: all visible.
@@ -145,20 +147,46 @@ git_head() {
   git -C "$repo_path" rev-parse HEAD 2>/dev/null || printf ''
 }
 
-# Spawn `understand_anyway build --project <id> --incremental --exclude-tests`. Returns
-# command exit code; in dry-run mode always returns 0.
+# Path to the mutable state-root graph used by build/incremental build.
+state_graph_path() {
+  local state_dir="$1"
+  printf '%s/.understand-anything/knowledge-graph.json' "$state_dir"
+}
+
+# Incremental nightly runs require both a persisted graph and a real git repo.
+# Archive-synced source trees (no .git) stay on full builds because the
+# incremental pipeline relies on git diff/change detection.
+can_run_incremental_build() {
+  local repo_path="$1"
+  local state_dir="$2"
+  [[ -d "$repo_path/.git" ]] && [[ -f "$(state_graph_path "$state_dir")" ]]
+}
+
+# Spawn `understand_anyway build --project <id> --exclude-tests`, using
+# `--incremental` only when the state root already has a graph and the source
+# repo has git metadata. Fresh deployments and archive-style source mirrors
+# stay on full builds. Returns command exit code; in dry-run mode always
+# returns 0.
 spawn_build() {
   local project_id="$1"
+  local repo_path="$2"
+  local state_dir="$3"
   local cmd=(understand_anyway build
     --project "$project_id"
     --config "$deploy_config"
-    --incremental
     --exclude-tests
     --no-dashboard)
+  if can_run_incremental_build "$repo_path" "$state_dir"; then
+    cmd+=(--incremental)
+  fi
   if [[ -n "$profile" ]]; then
     cmd+=(--profile "$profile")
   fi
-  run_or_print "${cmd[@]}"
+  if can_run_incremental_build "$repo_path" "$state_dir"; then
+    run_or_print "${cmd[@]}"
+    return
+  fi
+  UA_BUILD_MODE_OVERRIDE=full run_or_print "${cmd[@]}"
 }
 
 # Run the deterministic graph-health gate. UA_REVIEW_CMD is no longer honored
@@ -281,7 +309,7 @@ NODE
 
   # 3. spawn build
   build_status="success"
-  if ! spawn_build "$project_id" >>"$build_log" 2>&1; then
+  if ! spawn_build "$project_id" "$repo_path" "$state_dir" >>"$build_log" 2>&1; then
     build_status="failed"
   fi
 

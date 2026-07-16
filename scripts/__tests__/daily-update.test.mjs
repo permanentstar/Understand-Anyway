@@ -27,6 +27,23 @@ function makeTmp() {
   return mkdtempSync(resolve(tmpdir(), "ua-d4-daily-"));
 }
 
+function sleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function cleanupWork(path) {
+  const retryable = new Set(["ENOTEMPTY", "EBUSY", "EPERM"]);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      return;
+    } catch (error) {
+      if (!retryable.has(error?.code) || attempt === 19) throw error;
+      sleep(100 + attempt * 50);
+    }
+  }
+}
+
 // Replace nightly/refresh sub-scripts inside an isolated scripts/ copy with
 // shims that record argv to a log file. daily-update.sh resolves siblings via
 // SCRIPT_DIR/.. so we mirror real layout.
@@ -143,7 +160,7 @@ function runScript(scriptPath, args, env) {
       check("default: refresh got --host h --port 1", log.includes("--host h") && log.includes("--port 1"), log);
     }
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    cleanupWork(work);
   }
 }
 
@@ -172,7 +189,31 @@ function runScript(scriptPath, args, env) {
     const log = existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
     check("local-cli-fallback: gateway list used local cli", log.includes("local-cli gateway list --json"), log);
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    cleanupWork(work);
+  }
+}
+
+// --- Test 1b: refresh inherits plugin root resolved from UA_PLUGIN_ROOT env ---
+{
+  const work = makeTmp();
+  try {
+    const { scriptPath, refreshLog } = setupSandbox(work);
+    const { binDir } = setupFakeBin(work);
+    writeFileSync(resolve(work, "gateway-list.json"), JSON.stringify([{ versionId: "v1", current: true, stable: true }]));
+
+    const env = {
+      ...process.env,
+      PATH: `${binDir}:${process.env.PATH}`,
+      UA_PROJECTS_ROOT: resolve(work, "projects"),
+      UA_PLUGIN_ROOT: "/tmp/fake-plugin-root",
+      HOME: work,
+    };
+    const result = runScript(scriptPath, ["--no-self-update", "--host", "h", "--port", "1"], env);
+    check("plugin-root-env: exit 0", result.status === 0, `${result.status}\n${result.stderr}`);
+    const log = existsSync(refreshLog) ? readFileSync(refreshLog, "utf8") : "";
+    check("plugin-root-env: refresh got --plugin-root from env", log.includes("--plugin-root /tmp/fake-plugin-root"), log);
+  } finally {
+    cleanupWork(work);
   }
 }
 
@@ -195,7 +236,7 @@ function runScript(scriptPath, args, env) {
     check("no-self-update: pnpm install NOT invoked", !log.includes("pnpm install"), log);
     check("no-self-update: pnpm build NOT invoked", !log.includes("pnpm build"), log);
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    cleanupWork(work);
   }
 }
 
@@ -218,7 +259,7 @@ function runScript(scriptPath, args, env) {
     check("nightly-fail: exit non-zero", result.status !== 0, `status=${result.status}`);
     check("nightly-fail: refresh STILL invoked", existsSync(refreshLog) && readFileSync(refreshLog, "utf8").length > 0, "refresh log empty");
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    cleanupWork(work);
   }
 }
 
@@ -240,7 +281,7 @@ function runScript(scriptPath, args, env) {
     const log = existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
     check("publish: gateway publish invoked", log.includes("ua gateway publish"), log);
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    cleanupWork(work);
   }
 }
 
@@ -274,7 +315,7 @@ function runScript(scriptPath, args, env) {
       JSON.stringify(latest),
     );
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    cleanupWork(work);
   }
 }
 
@@ -310,7 +351,7 @@ function runScript(scriptPath, args, env) {
       result.stdout,
     );
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    cleanupWork(work);
   }
 }
 
@@ -341,7 +382,7 @@ function runScript(scriptPath, args, env) {
       log,
     );
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    cleanupWork(work);
   }
 }
 
@@ -355,7 +396,7 @@ function runScript(scriptPath, args, env) {
     check("help: exit 0", result.status === 0);
     check("help: prints usage", result.stdout.includes("Usage:"));
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    cleanupWork(work);
   }
 }
 
@@ -379,7 +420,7 @@ function runScript(scriptPath, args, env) {
     check("dryrun: --dry-run forwarded to nightly", nightly.includes("--dry-run"), nightly);
     check("dryrun: --dry-run forwarded to refresh", refresh.includes("--dry-run"), refresh);
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    cleanupWork(work);
   }
 }
 
@@ -409,7 +450,7 @@ function runScript(scriptPath, args, env) {
       log,
     );
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    cleanupWork(work);
   }
 }
 
@@ -436,7 +477,7 @@ function runScript(scriptPath, args, env) {
       result.stdout,
     );
   } finally {
-    rmSync(work, { recursive: true, force: true });
+    cleanupWork(work);
   }
 }
 
