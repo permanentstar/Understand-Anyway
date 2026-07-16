@@ -12,26 +12,56 @@ describe("parseDotenv", () => {
 });
 
 describe("loadDotenv", () => {
-  const cwd = "/work";
   const home = "/home/u";
+  const configDir = "/etc/app";
+  const homeEnv = resolve(home, ".env");
+  const configEnv = resolve(configDir, ".env");
 
-  it("merges ~/.env then ./.env with cwd winning", () => {
-    const cwdEnv = resolve(cwd, ".env");
-    const homeEnv = resolve(home, ".env");
+  it("returns ~/.env values when only home has a .env", () => {
     const merged = loadDotenv({
-      cwd,
+      configDir,
       home,
-      fileExists: (p) => p === cwdEnv || p === homeEnv,
+      fileExists: (p) => p === homeEnv,
+      readFile: () => "A=home\nB=home",
+    });
+    expect(merged).toEqual({ A: "home", B: "home" });
+  });
+
+  it("returns config .env values when only configDir has a .env", () => {
+    const merged = loadDotenv({
+      configDir,
+      home,
+      fileExists: (p) => p === configEnv,
+      readFile: () => "A=cfg",
+    });
+    expect(merged).toEqual({ A: "cfg" });
+  });
+
+  it("merges ~/.env then <configDir>/.env with config winning", () => {
+    const merged = loadDotenv({
+      configDir,
+      home,
+      fileExists: (p) => p === homeEnv || p === configEnv,
       readFile: (p) => {
         if (p === homeEnv) return "A=home\nB=home";
-        if (p === cwdEnv) return "A=cwd";
+        if (p === configEnv) return "A=cfg";
         return "";
       },
     });
-    expect(merged).toEqual({ A: "cwd", B: "home" });
+    expect(merged).toEqual({ A: "cfg", B: "home" });
+  });
+
+  it("skips configDir entirely when configDir is null", () => {
+    const merged = loadDotenv({
+      configDir: null,
+      home,
+      fileExists: (p) => p === homeEnv,
+      readFile: () => "A=home",
+    });
+    expect(merged).toEqual({ A: "home" });
   });
 
   it("returns {} when no .env files exist", () => {
-    expect(loadDotenv({ cwd, home, fileExists: () => false })).toEqual({});
+    expect(loadDotenv({ configDir, home, fileExists: () => false })).toEqual({});
   });
 });

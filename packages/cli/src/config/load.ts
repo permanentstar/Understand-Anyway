@@ -8,6 +8,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { parse as parseYamlDefault } from "yaml";
 import type { ProfileSection, ResolvedConfig } from "@understand-anyway/plugin-api";
 import { ArgsError, type ServeArgs } from "../args.js";
@@ -75,7 +76,7 @@ export function loadResolvedConfig(args: LoadResolvedConfigArgs, deps: LoadConfi
     throw new ArgsError(`invalid config ${path}: ${formatSchemaErrors(result.errors)}`);
   }
 
-  const dotenv = deps.dotenv ?? loadDotenv({ cwd, fileExists, readFile });
+  const dotenv = deps.dotenv ?? loadDotenv({ configDir: dirname(path), fileExists, readFile });
   const config = interpolate(parsed, { env, dotenv, readFile }) as ResolvedConfig;
   return applyDeployProfile(config, args.deployProfile ?? env.UA_DEPLOY_PROFILE ?? null);
 }

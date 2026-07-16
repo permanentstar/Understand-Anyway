@@ -1,6 +1,6 @@
 {
   "name": "@understand-anyway/provider-feishu-auth",
-  "version": "0.0.1-next.4",
+  "version": "0.0.1-next.5",
   "description": "Optional Feishu (Lark) OAuth2 login provider implementing the AuthProvider contract over public Feishu endpoints.",
   "license": "MIT",
   "type": "module",
