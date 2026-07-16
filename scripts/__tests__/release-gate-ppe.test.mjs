@@ -76,8 +76,16 @@ function run(args, env = {}) {
   assert.match(result.stdout, /ppe-oss-release/);
   assert.match(result.stdout, /ssh -n -o BatchMode=yes/);
   // Standard install: from a registry, not from a source checkout build.
-  assert.match(result.stdout, /npm (install|i) .*@understand-anyway\/cli/);
+  assert.match(result.stdout, /npm (install|i) .*@understand-anyway\/cli@0\.0\.1-next\.8/);
   assert.match(result.stdout, /--registry http:\/\/127\.0\.0\.1:4873/);
+  assert.match(result.stdout, /understand-anyway-plugin-api-0\.0\.1-next\.8\.tgz/);
+  assert.doesNotMatch(result.stdout, /understand-anyway-plugin-api-\*\.tgz/);
+  // Smoke dashboard port must be chosen on the PPE host at runtime so repeated
+  // release gates do not collide with a dashboard left running by another case.
+  assert.match(result.stdout, /SMOKE_PORT/);
+  assert.match(result.stdout, /start=18690; const end=18730/);
+  assert.match(result.stdout, /--port "\$SMOKE_PORT"/);
+  assert.doesNotMatch(result.stdout, /--port 18690/);
   // Ops orchestration runs via the bundled subcommand, no source repo.
   assert.match(result.stdout, /understand-anyway ops daily-update/);
   assert.doesNotMatch(result.stdout, /git pull/);

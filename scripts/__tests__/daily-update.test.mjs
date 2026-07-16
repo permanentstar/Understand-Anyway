@@ -2,7 +2,7 @@
 // scripts/__tests__/daily-update.test.mjs
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, chmodSync, cpSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync, chmodSync, cpSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -131,10 +131,31 @@ if (process.argv[2] === "gateway" && process.argv[3] === "list") {
   chmodSync(cliPath, 0o755);
 }
 
+function readLatestDailyLog(projectsRoot) {
+  const runsDir = resolve(projectsRoot, "gateway", "operations", "daily-runs");
+  if (!existsSync(runsDir)) return "";
+  for (const runId of readdirSync(runsDir).sort().reverse()) {
+    const logPath = resolve(runsDir, runId, "daily-update.log");
+    if (existsSync(logPath)) {
+      return readFileSync(logPath, "utf8");
+    }
+  }
+  return "";
+}
+
 function runScript(scriptPath, args, env) {
-  const effectiveEnv =
-    "UA_DEPLOY_PROFILE" in env ? env : { ...env, UA_DEPLOY_PROFILE: "ppe" };
-  return spawnSync("bash", [scriptPath, ...args], { encoding: "utf8", env: effectiveEnv });
+  const effectiveEnv = {
+    ...env,
+    UA_DAILY_UPDATE_PLAIN_LOG: env.UA_DAILY_UPDATE_PLAIN_LOG ?? "true",
+  };
+  if (!("UA_DEPLOY_PROFILE" in effectiveEnv)) {
+    effectiveEnv.UA_DEPLOY_PROFILE = "ppe";
+  }
+  const result = spawnSync("bash", [scriptPath, ...args], { encoding: "utf8", env: effectiveEnv });
+  if (effectiveEnv.UA_DAILY_UPDATE_PLAIN_LOG === "true" && effectiveEnv.UA_PROJECTS_ROOT) {
+    result.stdout = `${result.stdout || ""}${readLatestDailyLog(effectiveEnv.UA_PROJECTS_ROOT)}`;
+  }
+  return result;
 }
 
 // --- Test 1: default flow runs nightly then refresh ---

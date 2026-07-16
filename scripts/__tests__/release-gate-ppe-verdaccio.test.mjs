@@ -45,6 +45,9 @@ function run(args, env = {}) {
   assert.match(r.stdout, /scp/);
   assert.match(r.stdout, /npm publish/);
   assert.match(r.stdout, /ssh -n -o BatchMode=yes/);
+  assert.match(r.stdout, /understand-anyway-cli-0\.0\.1-next\.8\.tgz/);
+  assert.doesNotMatch(r.stdout, /understand-anyway-cli\.tgz/);
+  assert.match(r.stdout, /rm -rf .*verdaccio-tarballs/);
 
   // Publish order must be dependency-first, cli last.
   const idxPluginApi = r.stdout.indexOf("plugin-api");

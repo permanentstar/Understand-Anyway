@@ -99,6 +99,7 @@ try {
     PATH: `${binDir}:${process.env.PATH}`,
     UA_PROJECTS_ROOT: resolve(work, "projects"),
     UA_DEPLOY_PROFILE: "ppe",
+    UA_DAILY_UPDATE_PLAIN_LOG: "true",
     HOME: work,
   };
   const result = spawnSync(

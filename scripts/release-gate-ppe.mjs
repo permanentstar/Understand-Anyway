@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { writeFileSync, mkdirSync, readdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { REPO_ROOT, run, runCapture } from "./lib/release-gate-helpers.mjs";
@@ -80,11 +80,25 @@ function quote(value) {
   return `'${String(value).replace(/'/g, `'\"'\"'`)}'`;
 }
 
+function currentWorkspaceVersion() {
+  const packageJson = JSON.parse(
+    readFileSync(resolve(REPO_ROOT, "packages", "cli", "package.json"), "utf8"),
+  );
+  const version = String(packageJson.version || "").trim();
+  if (!version) throw new Error("unable to resolve current workspace version");
+  return version;
+}
+
+function tarballFilename(pkg, version) {
+  return `understand-anyway-${pkg}-${version}.tgz`;
+}
+
 function buildEnv() {
   const host = requiredEnv("UA_RELEASE_GATE_PPE_HOST");
   const user = requiredEnv("UA_RELEASE_GATE_PPE_USER");
   const root = requiredEnv("UA_RELEASE_GATE_PPE_ROOT");
   const pluginRoot = requiredEnv("UA_RELEASE_GATE_PPE_PLUGIN_ROOT");
+  const version = currentWorkspaceVersion();
   const repoBase = resolve(root, "0d7ada6");
   const npmBase = process.env.UA_RELEASE_GATE_PPE_NPM_DIR || resolve(root, "npm-installed-20260702-165612");
   const repoDir = process.env.UA_RELEASE_GATE_PPE_REPO_DIR || resolve(repoBase, "repo");
@@ -102,6 +116,7 @@ function buildEnv() {
     user,
     root,
     pluginRoot,
+    version,
     repoDir,
     repoProjectsRoot,
     npmBase,
@@ -252,6 +267,7 @@ function buildOssReleaseCommand(env, workRoot) {
   const verdaccioConfigFile = resolve(workRoot, "verdaccio.yaml");
   const verdaccioLog = resolve(workRoot, "verdaccio.log");
   const npmrcFile = resolve(workRoot, "npmrc");
+  const cliPackageSpec = `@understand-anyway/cli@${env.version}`;
   // Verdaccio accepts any token for $all publish, but the npm client still
   // requires an auth entry to send a publish request. Point a scoped userconfig
   // at a throwaway token for the local registry only.
@@ -281,7 +297,7 @@ function buildOssReleaseCommand(env, workRoot) {
     "version: 1",
     "deploy:",
     `  host: \"${env.host}\"`,
-    "  port: 18690",
+    "  port: __SMOKE_PORT__",
     "  outputLanguage: \"en\"",
     "gateway:",
     "  retain: 2",
@@ -332,7 +348,7 @@ function buildOssReleaseCommand(env, workRoot) {
   // Quote only the directory so the remote shell still expands the glob.
   const publishSegments = PKG_DIRS.map(
     (pkg) =>
-      `for f in ${quote(env.tarballDir)}/understand-anyway-${pkg}-*.tgz; do npm publish "$f" --userconfig ${quote(npmrcFile)} --registry ${env.registry} >/dev/null; done`,
+      `npm publish ${quote(resolve(env.tarballDir, tarballFilename(pkg, env.version)))} --userconfig ${quote(npmrcFile)} --registry ${env.registry} >/dev/null`,
   );
 
   return [
@@ -342,11 +358,13 @@ function buildOssReleaseCommand(env, workRoot) {
     // may have left it clean; recreate defensively.
     `rm -rf ${quote(workRoot)}`,
     ...traexShimSetupSegments(env, workRoot),
+    `SMOKE_PORT="$(node -e 'const net=require(\"node:net\"); const start=18690; const end=18730; const tryPort=(port)=>{ if(port>end){ process.stderr.write(\"no free smoke port\\n\"); process.exit(1); } const srv=net.createServer(); srv.once(\"error\",()=>tryPort(port+1)); srv.listen(port,\"${env.host}\",()=>{ const value=srv.address()?.port || port; srv.close(()=>process.stdout.write(String(value))); }); }; tryPort(start);')"` ,
+    "[ -n \"$SMOKE_PORT\" ]",
     // Prepare workspace + configs.
     `mkdir -p ${quote(installRoot)} ${quote(srcRoot)} ${quote(resolve(projectsRoot, "gateway", "config"))} ${quote(resolve(workRoot, "verdaccio-storage"))}`,
     `printf %s ${quote(encodedGreet)} | base64 -d > ${quote(resolve(srcRoot, "greet.js"))}`,
     `printf %s ${quote(encodedIndex)} | base64 -d > ${quote(resolve(srcRoot, "index.js"))}`,
-    `printf %s ${quote(encodedYaml)} | base64 -d > ${quote(deployConfig)}`,
+    `printf %s ${quote(encodedYaml)} | base64 -d | sed "s/__SMOKE_PORT__/$SMOKE_PORT/" > ${quote(deployConfig)}`,
     `printf %s ${quote(encodedVerdaccio)} | base64 -d > ${quote(verdaccioConfigFile)}`,
     `printf '%s\\n' ${quote(`${registryNoScheme}/:_authToken=ua-oss-release`)} > ${quote(npmrcFile)}`,
     // Start Verdaccio detached from the ssh channel: setsid + </dev/null so it
@@ -360,7 +378,7 @@ function buildOssReleaseCommand(env, workRoot) {
     // Standard install from the local registry into a clean prefix.
     `cd ${quote(installRoot)}`,
     "npm init -y >/dev/null 2>&1",
-    `npm install @understand-anyway/cli --userconfig ${quote(npmrcFile)} --registry ${env.registry} --no-fund --no-audit`,
+    `npm install ${quote(cliPackageSpec)} --userconfig ${quote(npmrcFile)} --registry ${env.registry} --no-fund --no-audit`,
     `export PATH=${quote(binDir)}:$PATH`,
     `export UA_PROJECTS_ROOT=${quote(projectsRoot)}`,
     `export UA_PLUGIN_ROOT=${quote(env.pluginRoot)}`,
@@ -372,7 +390,7 @@ function buildOssReleaseCommand(env, workRoot) {
       "--deploy-profile ppe",
       "--llm-profile traex",
       `--host ${quote(env.host)}`,
-      "--port 18690",
+      '--port "$SMOKE_PORT"',
       "--no-self-update",
       `--plugin-root ${quote(env.pluginRoot)}`,
     ].join(" "),
@@ -451,6 +469,7 @@ export function buildOssReleaseTeardownSshCommand(env) {
 // lifting runs on the controller, not inside the ssh channel.
 function prepareOssReleaseArtifacts(env) {
   const localTmp = resolve(REPO_ROOT, ".release-gate", "verdaccio-tarballs");
+  rmSync(localTmp, { recursive: true, force: true });
   mkdirSync(localTmp, { recursive: true });
   run("pnpm", ["-r", "build"], { cwd: REPO_ROOT, stdio: "inherit" });
   for (const pkg of PKG_DIRS) {
@@ -462,17 +481,16 @@ function prepareOssReleaseArtifacts(env) {
       stdio: "inherit",
     });
   }
-  run("ssh", ["-n", "-o", "BatchMode=yes", `${env.user}@${env.host}`, `mkdir -p ${quote(env.tarballDir)}`], {
+  run("ssh", ["-n", "-o", "BatchMode=yes", `${env.user}@${env.host}`, `rm -rf ${quote(env.tarballDir)}; mkdir -p ${quote(env.tarballDir)}`], {
     cwd: REPO_ROOT,
     stdio: "inherit",
   });
-  // Resolve the packed tarball for each package (name is
-  // understand-anyway-<pkg>-<version>.tgz) and scp with explicit paths — no
-  // shell globbing, so quoting stays safe.
-  const staged = readdirSync(localTmp).filter((f) => f.endsWith(".tgz"));
+  // Resolve the packed tarball for the CURRENT workspace version only and scp
+  // explicit filenames so stale tarballs can never leak into the PPE registry.
+  const staged = new Set(readdirSync(localTmp).filter((f) => f.endsWith(".tgz")));
   for (const pkg of PKG_DIRS) {
-    const file = staged.find((f) => f.startsWith(`understand-anyway-${pkg}-`));
-    if (!file) throw new Error(`packed tarball not found for ${pkg} in ${localTmp}`);
+    const file = tarballFilename(pkg, env.version);
+    if (!staged.has(file)) throw new Error(`packed tarball not found for ${pkg} in ${localTmp}: ${file}`);
     run("scp", [resolve(localTmp, file), `${env.user}@${env.host}:${env.tarballDir}/`], {
       cwd: REPO_ROOT,
       stdio: "inherit",

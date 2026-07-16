@@ -13,7 +13,7 @@
 //
 // --dry-run prints the plan and exits without touching anything.
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { REPO_ROOT, run } from "./lib/release-gate-helpers.mjs";
 
@@ -80,19 +80,29 @@ function quote(value) {
   return `'${String(value).replace(/'/g, `'"'"'`)}'`;
 }
 
+function currentWorkspaceVersion() {
+  const packageJson = JSON.parse(
+    readFileSync(resolve(REPO_ROOT, "packages", "cli", "package.json"), "utf8"),
+  );
+  const version = String(packageJson.version || "").trim();
+  if (!version) throw new Error("unable to resolve current workspace version");
+  return version;
+}
+
 export function buildEnv() {
   const host = requiredEnv("UA_RELEASE_GATE_PPE_HOST");
   const user = requiredEnv("UA_RELEASE_GATE_PPE_USER");
   const root = requiredEnv("UA_RELEASE_GATE_PPE_ROOT");
+  const version = currentWorkspaceVersion();
   const registry = process.env.UA_RELEASE_GATE_PPE_REGISTRY || "http://127.0.0.1:4873";
   const storage = process.env.UA_RELEASE_GATE_PPE_VERDACCIO_STORAGE || `${root}/verdaccio-storage`;
   const tarballDir = process.env.UA_RELEASE_GATE_PPE_TARBALL_DIR || `${root}/verdaccio-tarballs`;
   const listen = registry.replace(/^https?:\/\//, "");
-  return { host, user, root, registry, storage, tarballDir, listen };
+  return { host, user, root, version, registry, storage, tarballDir, listen };
 }
 
-function tarballName(pkgDir) {
-  return `understand-anyway-${pkgDir}.tgz`;
+function tarballName(pkgDir, version) {
+  return `understand-anyway-${pkgDir}-${version}.tgz`;
 }
 
 // Verdaccio config that allows anonymous publish to the local registry only.
@@ -127,7 +137,7 @@ export function planLines(env) {
   lines.push("");
   lines.push("# 2. local pack (dependency order)");
   for (const pkg of PKG_DIRS) {
-    lines.push(`npm pack ./packages/${pkg} --pack-destination <local-tmp>   # -> ${tarballName(pkg)}`);
+    lines.push(`npm pack ./packages/${pkg} --pack-destination <local-tmp>   # -> ${tarballName(pkg, env.version)}`);
   }
   lines.push("");
   lines.push("# 3. start Verdaccio on PPE");
@@ -135,7 +145,7 @@ export function planLines(env) {
     `ssh -n -o BatchMode=yes ${env.user}@${env.host} ` +
       quote(
         [
-          `mkdir -p ${quote(env.storage)} ${quote(env.tarballDir)}`,
+          `mkdir -p ${quote(env.storage)} && rm -rf ${quote(env.tarballDir)} && mkdir -p ${quote(env.tarballDir)}`,
           `npx --yes verdaccio@6 --listen ${env.listen} --config <remote>/verdaccio.yaml &`,
         ].join("; "),
       ),
@@ -143,14 +153,14 @@ export function planLines(env) {
   lines.push("");
   lines.push("# 4. scp tarballs to PPE");
   for (const pkg of PKG_DIRS) {
-    lines.push(`scp <local-tmp>/${tarballName(pkg)} ${env.user}@${env.host}:${env.tarballDir}/`);
+    lines.push(`scp <local-tmp>/${tarballName(pkg, env.version)} ${env.user}@${env.host}:${env.tarballDir}/`);
   }
   lines.push("");
   lines.push("# 5. publish into Verdaccio (dependency order)");
   for (const pkg of PKG_DIRS) {
     lines.push(
       `ssh -n -o BatchMode=yes ${env.user}@${env.host} ` +
-        quote(`npm publish ${quote(`${env.tarballDir}/${tarballName(pkg)}`)} --registry ${env.registry}`),
+        quote(`npm publish ${quote(`${env.tarballDir}/${tarballName(pkg, env.version)}`)} --registry ${env.registry}`),
     );
   }
   return lines;
@@ -179,6 +189,7 @@ function main() {
   }
 
   const localTmp = resolve(REPO_ROOT, ".release-gate", "verdaccio-tarballs");
+  rmSync(localTmp, { recursive: true, force: true });
   mkdirSync(localTmp, { recursive: true });
 
   // 1. build
@@ -197,7 +208,9 @@ function main() {
   const remoteConfig = `${env.root}/verdaccio.yaml`;
   const encodedConfig = Buffer.from(verdaccioConfig(env), "utf8").toString("base64");
   const startRemote = [
-    `mkdir -p ${quote(env.storage)} ${quote(env.tarballDir)}`,
+    `mkdir -p ${quote(env.storage)}`,
+    `rm -rf ${quote(env.tarballDir)}`,
+    `mkdir -p ${quote(env.tarballDir)}`,
     `printf %s ${quote(encodedConfig)} | base64 -d > ${quote(remoteConfig)}`,
     `pkill -f 'verdaccio.*${env.listen}' 2>/dev/null || true`,
     // Fully detach the daemon from this ssh channel: setsid + </dev/null and
@@ -213,9 +226,8 @@ function main() {
 
   // 4. scp tarballs
   for (const pkg of PKG_DIRS) {
-    // npm pack names tarballs as understand-anyway-<pkg>-<version>.tgz; use a
-    // glob-free deterministic copy by resolving the actual filename first.
-    run("bash", ["-c", `scp ${quote(`${localTmp}/understand-anyway-${pkg}-*.tgz`)} ${env.user}@${env.host}:${quote(`${env.tarballDir}/`)}`], {
+    const file = resolve(localTmp, tarballName(pkg, env.version));
+    run("scp", [file, `${env.user}@${env.host}:${env.tarballDir}/`], {
       cwd: REPO_ROOT,
       stdio: "inherit",
     });
@@ -223,7 +235,7 @@ function main() {
 
   // 5. publish in dependency order
   for (const pkg of PKG_DIRS) {
-    const publishRemote = `for f in ${quote(`${env.tarballDir}/understand-anyway-${pkg}-*.tgz`)}; do npm publish "$f" --registry ${env.registry}; done`;
+    const publishRemote = `npm publish ${quote(`${env.tarballDir}/${tarballName(pkg, env.version)}`)} --registry ${env.registry}`;
     run("ssh", ["-n", "-o", "BatchMode=yes", `${env.user}@${env.host}`, publishRemote], {
       cwd: REPO_ROOT,
       stdio: "inherit",

@@ -128,7 +128,11 @@ mkdir -p "$operations_root/daily-runs"
 run_dir="$operations_root/daily-runs/$run_id"
 mkdir -p "$run_dir"
 log_path="$run_dir/daily-update.log"
-exec > >(tee -a "$log_path") 2>&1
+if [[ "${UA_DAILY_UPDATE_PLAIN_LOG:-false}" == "true" ]]; then
+  exec >>"$log_path" 2>&1
+else
+  exec > >(tee -a "$log_path") 2>&1
+fi
 
 printf '[daily-update] root=%s run_id=%s log=%s deploy_profile=%s\n' \
   "$ROOT_DIR" "$run_id" "$log_path" "$deploy_profile"
