@@ -123,6 +123,26 @@ describe("runGateway publish", () => {
     }
   });
 
+    it("reuses already packaged gateway releases without rebuilding node_modules", () => {
+      const work = mkdtempSync(resolve(tmpdir(), "ua-gateway-packaged-copy-"));
+      try {
+        const packageRoot = resolve(work, "packaged-release");
+        mkdirSync(resolve(packageRoot, "dist"), { recursive: true });
+        mkdirSync(resolve(packageRoot, "node_modules"), { recursive: true });
+        writeFileSync(resolve(packageRoot, "package.json"), JSON.stringify({ name: "@understand-anyway/cli" }), "utf8");
+        writeFileSync(resolve(packageRoot, "manifest.json"), JSON.stringify({ version: 1 }), "utf8");
+        writeFileSync(resolve(packageRoot, "dist/cli.js"), 'console.log("ok");\n', "utf8");
+        symlinkSync("../missing-package", resolve(packageRoot, "node_modules", "broken-link"), "file");
+
+        const releaseRoot = resolve(work, "release");
+        expect(() => copyInstalledCliPackageRelease(packageRoot, releaseRoot)).not.toThrow();
+        expect(existsSync(resolve(releaseRoot, "manifest.json"))).toBe(true);
+        expect(lstatSync(resolve(releaseRoot, "node_modules", "broken-link")).isSymbolicLink()).toBe(true);
+      } finally {
+        rmSync(work, { recursive: true, force: true });
+      }
+    });
+
   it("copies the flat npm node_modules tree for installed-cli releases", () => {
     const work = mkdtempSync(resolve(tmpdir(), "ua-gateway-installed-npm-"));
     try {
@@ -207,6 +227,100 @@ describe("runGateway start seeding", () => {
     expect(seenRoots).toEqual([resolve(projectsRoot, "gateway", "portal-assets")]);
     expect(startCalled).toBe(true);
     expect(logs.some((l) => l.includes("seeded default assets") && l.includes("portal-background.png"))).toBe(true);
+  });
+
+  it("does not resolve or prepare overlay portal assets during startup", async () => {
+    projectsRoot = mkdtempSync(resolve(tmpdir(), "ua-gateway-start-overlay-"));
+    const logs: string[] = [];
+    let startCalled = false;
+
+    await runGateway({
+      command: "gateway",
+      action: "start",
+      projectsRoot,
+      host: "127.0.0.1",
+      port: 0,
+      noOpen: true,
+      config: null,
+      serveProfile: null,
+    }, {
+      log: (message: string) => logs.push(message),
+      seedPortalAssets: () => ({ seeded: [] }),
+      startDeps: {
+        // Stub the daemon launcher so no real process spawns.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        spawn: (() => {
+          startCalled = true;
+          const child: any = {
+            pid: 4242,
+            on(event: string, cb: (...a: unknown[]) => void) {
+              if (event === "message") {
+                setImmediate(() =>
+                  cb({ type: "dashboard-ready", host: "127.0.0.1", port: 18690, url: "http://127.0.0.1:18690/?token=x" }),
+                );
+              }
+              return child;
+            },
+            removeAllListeners() { return child; },
+            disconnect() {},
+            unref() {},
+            kill() {},
+          };
+          return child;
+        }) as never,
+      },
+    });
+
+    expect(startCalled).toBe(true);
+    expect(logs.some((l) => l.includes("prepared overlay assets"))).toBe(false);
+  });
+
+  it("forwards configured portalAssetsSubdir as an environment-scoped mode switch", async () => {
+    projectsRoot = mkdtempSync(resolve(tmpdir(), "ua-gateway-start-subdir-"));
+    mkdirSync(resolve(projectsRoot, "gateway", "config"), { recursive: true });
+    writeFileSync(
+      resolve(projectsRoot, "gateway", "config", "deploy.yaml"),
+      "version: 1\ngateway:\n  portalAssetsSubdir: overlay\n",
+      "utf8",
+    );
+    let childEnv: NodeJS.ProcessEnv | undefined;
+
+    await runGateway({
+      command: "gateway",
+      action: "start",
+      projectsRoot,
+      host: "127.0.0.1",
+      port: 0,
+      noOpen: true,
+      config: null,
+      serveProfile: null,
+    }, {
+      seedPortalAssets: () => ({ seeded: [] }),
+      startDeps: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        spawn: ((_command: string, _args: string[], options: any) => {
+          childEnv = options.env;
+          const child: any = {
+            pid: 4242,
+            on(event: string, cb: (...a: unknown[]) => void) {
+              if (event === "message") {
+                setImmediate(() =>
+                  cb({ type: "dashboard-ready", host: "127.0.0.1", port: 18690, url: "http://127.0.0.1:18690/?token=x" }),
+                );
+              }
+              return child;
+            },
+            removeAllListeners() { return child; },
+            disconnect() {},
+            unref() {},
+            kill() {},
+          };
+          return child;
+        }) as never,
+      },
+    });
+
+    expect(childEnv?.UA_PORTAL_ASSETS_SUBDIR).toBe("overlay");
   });
 });
 

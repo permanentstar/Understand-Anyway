@@ -128,16 +128,16 @@ function readEnvPort(env: Record<string, string | undefined>, key: string): numb
 function resolvePortalConventionPaths(env: NodeJS.ProcessEnv): {
   portalAssetsRoot: string;
   projectsConfigPath: string;
+  portalAssetsSubdir?: string;
 } {
   const envAssets = (env.UA_PORTAL_ASSETS_ROOT ?? "").trim();
   const envConfig = (env.UA_PROJECTS_CONFIG_PATH ?? "").trim();
-  if (envAssets && envConfig) {
-    return { portalAssetsRoot: envAssets, projectsConfigPath: envConfig };
-  }
+  const envSubdir = (env.UA_PORTAL_ASSETS_SUBDIR ?? "").trim();
   const projectsRoot = resolveProjectsRoot({ env });
   return {
     portalAssetsRoot: envAssets || buildPortalAssetsRoot(projectsRoot),
     projectsConfigPath: envConfig || buildProjectsConfigPath(projectsRoot),
+    ...(envSubdir ? { portalAssetsSubdir: envSubdir } : {}),
   };
 }
 
@@ -237,6 +237,10 @@ export async function runServe(args: ServeArgs, options: RunServeOptions = {}): 
   const effectiveArgs: ServeArgs = { ...args, portal, projectRoute, registryPath, embeddingProvider: embeddingPackageName };
 
   const portalConvention = resolvePortalConventionPaths(env);
+  if (!portalConvention.portalAssetsSubdir) {
+    const configuredSubdir = (activeConfig.gateway?.portalAssetsSubdir ?? "").trim();
+    if (configuredSubdir) portalConvention.portalAssetsSubdir = configuredSubdir;
+  }
 
   const record = await buildRecordProvider(effectiveArgs, { stateRoot, log, record: config.record });
   if (record) log(`record sink: ${record.name}`);
@@ -253,6 +257,7 @@ export async function runServe(args: ServeArgs, options: RunServeOptions = {}): 
     registryPath,
     portalDisplay: resolvePortalDisplay(profile, config.deploy),
     portalAssetsRoot: portal ? portalConvention.portalAssetsRoot : undefined,
+    portalAssetsSubdir: portal ? portalConvention.portalAssetsSubdir : undefined,
     projectsConfigPath: portal ? portalConvention.projectsConfigPath : undefined,
     log,
   });

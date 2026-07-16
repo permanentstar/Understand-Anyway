@@ -144,6 +144,30 @@ describe("shouldReuseDashboard", () => {
     ).toBe(false);
   });
 
+  it("false when portal asset subdir mismatch", () => {
+    const args = makeArgs({ portalAssetsSubdir: "overlay" });
+    expect(
+      shouldReuseDashboard(
+        args,
+        {
+          ...baseExisting,
+          stateRoot,
+          distDir,
+          pid: 1,
+          metadata: {
+            serveProfile: null,
+            portal: false,
+            projectRoute: false,
+            registryPath: null,
+            configPath: null,
+            portalAssetsSubdir: null,
+          },
+        },
+        { isPidAlive: () => true },
+      ),
+    ).toBe(false);
+  });
+
   it("false when pid is dead", () => {
     const args = makeArgs();
     expect(
@@ -215,6 +239,22 @@ describe("runDashboardStart", () => {
     expect(spawn).toHaveBeenCalledTimes(1);
     const persisted = readDashboardPid(stateRoot);
     expect(persisted?.pid).toBe(4242);
+  });
+
+  it("forwards portal asset subdir through env and pid metadata", async () => {
+    const { spawn } = fakeSpawnReady();
+    await runDashboardStart(
+      makeArgs({ portalAssetsSubdir: "overlay" }),
+      makeDeps({ spawn: spawn as never }),
+    );
+    const [, , options] = spawn.mock.calls[0] as unknown as [
+      string,
+      string[],
+      { env: NodeJS.ProcessEnv },
+    ];
+    expect(options.env.UA_PORTAL_ASSETS_SUBDIR).toBe("overlay");
+    const persisted = readDashboardPid(stateRoot);
+    expect(persisted?.metadata?.portalAssetsSubdir).toBe("overlay");
   });
 
   it("does not forward derived default config paths as explicit daemon --config", async () => {

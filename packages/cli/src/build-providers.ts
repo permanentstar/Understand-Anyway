@@ -59,6 +59,8 @@ export interface BuildProvidersDeps {
    * (sortOrder / visible filter / version / name override / description).
    */
   projectsConfigPath?: string;
+  /** Optional relative subdir under `<projectsRoot>/gateway/portal-assets/`. */
+  portalAssetsSubdir?: string;
   log?: (message: string) => void;
   /** Dynamic module loader. Injectable for tests. */
   importModule?: (pkg: string) => Promise<Record<string, unknown>>;
@@ -92,6 +94,19 @@ async function loadFactory<T>(
   return factory as T;
 }
 
+export async function loadPortalAssetsContribution(
+  pkg: string,
+  config: unknown,
+  importModule: (pkg: string) => Promise<Record<string, unknown>> = defaultImportModule,
+): Promise<PortalAssetsContribution> {
+  const factory = await loadFactory<PortalAssetsFactory>(
+    pkg,
+    PROVIDER_FACTORY_EXPORTS.portalAssets,
+    importModule,
+  );
+  return factory(config ?? {});
+}
+
 export async function buildProviders(args: ServeArgs, deps: BuildProvidersDeps): Promise<BuiltProviders> {
   const importModule = deps.importModule ?? defaultImportModule;
   const providers = deps.config.providers ?? {};
@@ -123,31 +138,25 @@ export async function buildProviders(args: ServeArgs, deps: BuildProvidersDeps):
     let assetsDir: string | undefined;
     let assets: PortalAssets | undefined;
     if (portalAssetsPackage) {
-      const factory = await loadFactory<PortalAssetsFactory>(
+      const contribution = await loadPortalAssetsContribution(
         portalAssetsPackage,
-        PROVIDER_FACTORY_EXPORTS.portalAssets,
+        providers.portalAssets?.config,
         importModule,
-      );
-      const contribution: PortalAssetsContribution = await factory(
-        providers.portalAssets?.config ?? {},
       );
       assetsDir = contribution.assetsDir;
       assets = contribution.assets;
     }
-    // Two-tier portal convention: fall back to <projectsRoot>/gateway/portal-assets/
-    // for the served asset directory when no overlay factory contributed one.
-    if (!assetsDir && deps.portalAssetsRoot) {
-      assetsDir = deps.portalAssetsRoot;
-    }
+    const servedAssetsDir = assetsDir ?? deps.portalAssetsRoot;
     built.portal = {
       registryPath: deps.registryPath as string,
       title: display.title,
       links: display.links,
       lang: display.lang,
       wordmarkAlt: display.wordmarkAlt,
-      assetsDir,
+      assetsDir: servedAssetsDir,
       assets,
       portalAssetsRoot: deps.portalAssetsRoot,
+      portalAssetsSubdir: assetsDir ? undefined : deps.portalAssetsSubdir,
       projectsConfigPath: deps.projectsConfigPath,
     };
   }

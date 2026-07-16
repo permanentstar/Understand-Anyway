@@ -61,6 +61,8 @@ export interface AssemblePortalViewOptions {
    * (`icons/<projectId>.<ext>`) are used to fill `iconUrl`.
    */
   portalAssetsRoot?: string;
+  /** Optional relative subdir under `<projectsRoot>/gateway/portal-assets/`. */
+  portalAssetsSubdir?: string;
   /**
    * Optional resolver for `<stateRoot>/versioned-state.json`. Defaults to the
    * gateway's built-in reader; tests inject a stub to avoid touching disk.
@@ -146,6 +148,7 @@ export function assemblePortalView(options: AssemblePortalViewOptions): PortalVi
             resolveProjectIconUrl({
               projectId: record.id,
               portalAssetsRoot: options.portalAssetsRoot,
+              portalAssetsSubdir: options.portalAssetsSubdir,
             })
         : undefined);
 
@@ -206,7 +209,7 @@ function resolveBrandAssets(options: AssemblePortalViewOptions): PortalAssets | 
   if (!root) return undefined;
   const assets: PortalAssets = {};
   for (const [field, baseName] of Object.entries(BRAND_ASSET_CONVENTION)) {
-    const url = resolveNamedPortalAssetUrl(root, baseName);
+    const url = resolveNamedPortalAssetUrl(root, baseName, options.portalAssetsSubdir);
     if (url) assets[field as keyof typeof BRAND_ASSET_CONVENTION] = url;
   }
   return Object.keys(assets).length > 0 ? assets : undefined;

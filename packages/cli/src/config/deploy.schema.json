@@ -41,10 +41,15 @@
     },
     "gateway": {
       "type": "object",
-      "description": "Shared gateway runtime defaults. `retain` is the number of non-protected releases to keep on every `gateway publish`.",
+      "description": "Shared gateway runtime defaults. `retain` is the number of non-protected releases to keep on every `gateway publish`. `portalAssetsSubdir` optionally scopes portal asset reads to a relative subdir under `<projectsRoot>/gateway/portal-assets/`.",
       "additionalProperties": false,
       "properties": {
-        "retain": { "type": "integer", "minimum": 1 }
+        "retain": { "type": "integer", "minimum": 1 },
+        "portalAssetsSubdir": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*//).+$"
+        }
       }
     },
     "providers": {

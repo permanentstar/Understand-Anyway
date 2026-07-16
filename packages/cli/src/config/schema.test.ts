@@ -77,7 +77,7 @@ describe("validateDeployConfig", () => {
     cfg.deployProfiles = {
       ppe: {
         deploy: { port: 18690, outputLanguage: "zh" },
-        gateway: { retain: 2 },
+        gateway: { retain: 2, portalAssetsSubdir: "overlay" },
         build: { mode: "full", llmAnalysis: true, llmRequired: false },
       },
       prod: {
@@ -97,6 +97,22 @@ describe("validateDeployConfig", () => {
       },
     };
     expect(validateDeployConfig(cfg).valid).toBe(true);
+  });
+
+  it("accepts an optional relative gateway.portalAssetsSubdir", () => {
+    const cfg = valid();
+    cfg.gateway = { portalAssetsSubdir: "overlay" };
+    expect(validateDeployConfig(cfg).valid).toBe(true);
+  });
+
+  it("rejects non-relative gateway.portalAssetsSubdir values", () => {
+    const abs = valid();
+    abs.gateway = { portalAssetsSubdir: "/overlay" };
+    expect(validateDeployConfig(abs).valid).toBe(false);
+
+    const traversal = valid();
+    traversal.gateway = { portalAssetsSubdir: "../overlay" };
+    expect(validateDeployConfig(traversal).valid).toBe(false);
   });
 
   it("passes unknown fields through on deploy (portal display passthrough)", () => {

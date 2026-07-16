@@ -12,6 +12,7 @@
 import { resolve } from "node:path";
 import type { DashboardArgs } from "../args.js";
 import { CLI_ENTRY } from "../cli-entry.js";
+import { loadResolvedConfig } from "../config/load.js";
 import { resolveProjectContext, resolveProjectDistDir, resolveProjectsRoot } from "../project-context.js";
 import { buildDashboardDist } from "./build-dashboard-dist.js";
 import { runDashboardStart, type DashboardStartArgs, type DashboardStartDeps } from "./dashboard-start.js";
@@ -50,6 +51,10 @@ export async function runDashboard(args: DashboardArgs, deps: RunDashboardDeps =
     const distDir = args.pluginRoot
       ? resolve(ctx.stateRoot, "dashboard-dist")
       : resolveProjectDistDir(ctx.stateRoot);
+    const configPath = args.config ? resolve(args.config) : ctx.deployConfigPath;
+    const config = args.portal
+      ? loadResolvedConfig({ config: configPath, configExplicit: Boolean(args.config) })
+      : {};
     const startArgs: DashboardStartArgs = {
       stateDir: ctx.stateRoot,
       distDir,
@@ -58,13 +63,14 @@ export async function runDashboard(args: DashboardArgs, deps: RunDashboardDeps =
       port: args.port,
       token: args.token,
       noOpen: args.noOpen,
-      config: args.config ? resolve(args.config) : ctx.deployConfigPath,
-        configExplicit: Boolean(args.config),
+      config: configPath,
+      configExplicit: Boolean(args.config),
       serveProfile: args.serveProfile,
       portal: args.portal,
       projectRoute: args.projectRoute,
       registryPath: args.registryPath ? resolve(args.registryPath) : null,
       portalAssetsRoot: ctx.portalAssetsRoot,
+      portalAssetsSubdir: config.gateway?.portalAssetsSubdir ?? null,
       projectsConfigPath: ctx.projectsConfigPath,
       pluginRoot: args.pluginRoot ? resolve(args.pluginRoot) : null,
       rebuildDashboard: args.rebuildDashboard,

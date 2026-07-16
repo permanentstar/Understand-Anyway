@@ -41,6 +41,7 @@ export type PortalIconExtension = (typeof PORTAL_ICON_EXTENSIONS)[number];
 export interface ResolveProjectIconUrlOptions {
   projectId: string;
   portalAssetsRoot?: string;
+  portalAssetsSubdir?: string;
 }
 
 /**
@@ -54,8 +55,12 @@ export function resolveProjectIconUrl(
   if (!projectId) return undefined;
   const portalAssetsRoot = options.portalAssetsRoot;
   if (!portalAssetsRoot) return undefined;
-  return resolveConventionAssetUrl(portalAssetsRoot, "icons", projectId)
-    ?? resolveConventionAssetUrl(portalAssetsRoot, "", "generic");
+  const assetSubdir = normalizePortalAssetsSubdir(options.portalAssetsSubdir);
+  return resolveConventionAssetUrl(
+    portalAssetsRoot,
+    joinPortalAssetSubpath(assetSubdir, "icons"),
+    projectId,
+  ) ?? resolveConventionAssetUrl(portalAssetsRoot, assetSubdir, "generic");
 }
 
 /**
@@ -69,11 +74,12 @@ export function resolveProjectIconUrl(
 export function resolveNamedPortalAssetUrl(
   portalAssetsRoot: string,
   baseName: string,
+  portalAssetsSubdir?: string,
 ): string | undefined {
   const root = (portalAssetsRoot ?? "").trim();
   const name = (baseName ?? "").trim();
   if (!root || !name) return undefined;
-  return resolveConventionAssetUrl(root, "", name);
+  return resolveConventionAssetUrl(root, normalizePortalAssetsSubdir(portalAssetsSubdir), name);
 }
 
 /**
@@ -86,13 +92,14 @@ function resolveConventionAssetUrl(
   subdir: string,
   baseName: string,
 ): string | undefined {
+  const routeDir = encodePortalAssetRouteDir(subdir);
   for (const ext of PORTAL_ICON_EXTENSIONS) {
     const absolute = subdir
       ? resolve(portalAssetsRoot, subdir, `${baseName}${ext}`)
       : resolve(portalAssetsRoot, `${baseName}${ext}`);
     if (!existsSync(absolute)) continue;
-    const routeSuffix = subdir
-      ? `${subdir}/${encodeURIComponent(baseName)}${ext}`
+    const routeSuffix = routeDir
+      ? `${routeDir}/${encodeURIComponent(baseName)}${ext}`
       : `${encodeURIComponent(baseName)}${ext}`;
     const url = `${PORTAL_ASSET_ROUTE_PREFIX}${routeSuffix}`;
     try {
@@ -114,6 +121,7 @@ function resolveConventionAssetUrl(
 export function resolvePortalAssetFsPath(
   requestPath: string,
   portalAssetsRoot: string,
+  portalAssetsSubdir?: string,
 ): string | null {
   if (!requestPath || !requestPath.startsWith(PORTAL_ASSET_ROUTE_PREFIX)) return null;
   let relativePath: string;
@@ -126,6 +134,10 @@ export function resolvePortalAssetFsPath(
   if (!relativePath) return null;
   if (relativePath.startsWith("/")) return null;
   if (relativePath.split("/").some((segment) => segment === "..")) return null;
+  const assetSubdir = normalizePortalAssetsSubdir(portalAssetsSubdir);
+  if (assetSubdir && relativePath !== assetSubdir && !relativePath.startsWith(`${assetSubdir}/`)) {
+    return null;
+  }
   const root = resolve(portalAssetsRoot);
   const absolute = resolve(root, relativePath);
   if (absolute !== root && !absolute.startsWith(root + pathSep)) return null;
@@ -163,9 +175,10 @@ export function tryServePortalAsset(
   res: ServerResponse,
   requestPath: string,
   portalAssetsRoot: string,
+  portalAssetsSubdir?: string,
 ): boolean {
   if (!requestPath.startsWith(PORTAL_ASSET_ROUTE_PREFIX)) return false;
-  const absolute = resolvePortalAssetFsPath(requestPath, portalAssetsRoot);
+  const absolute = resolvePortalAssetFsPath(requestPath, portalAssetsRoot, portalAssetsSubdir);
   if (!absolute) return false;
   if (!existsSync(absolute) || !statSync(absolute, { throwIfNoEntry: false })?.isFile()) {
     sendText(res, 404, "portal asset not found");
@@ -178,4 +191,28 @@ export function tryServePortalAsset(
     "Cache-Control": "public, max-age=300",
   });
   return true;
+}
+
+function normalizePortalAssetsSubdir(subdir: string | null | undefined): string {
+  const normalized = String(subdir ?? "")
+    .trim()
+    .replaceAll("\\", "/")
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "");
+  if (!normalized) return "";
+  const segments = normalized.split("/");
+  if (segments.some((segment) => !segment || segment === "." || segment === "..")) return "";
+  return segments.join("/");
+}
+
+function joinPortalAssetSubpath(left: string, right: string): string {
+  return [left, right].filter(Boolean).join("/");
+}
+
+function encodePortalAssetRouteDir(subdir: string): string {
+  return subdir
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
 }

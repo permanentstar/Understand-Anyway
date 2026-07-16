@@ -25,6 +25,7 @@ import {
 } from "@understand-anyway/gateway";
 import type { GatewayArgs } from "../args.js";
 import { CLI_ENTRY } from "../cli-entry.js";
+import { loadResolvedConfig } from "../config/load.js";
 import {
   buildDeployConfigPath,
   buildGatewayRegistryPath,
@@ -118,6 +119,7 @@ export function copyInstalledCliPackageRelease(
     force: true,
     dereference: !alreadyPackagedGatewayRelease,
   });
+  if (alreadyPackagedGatewayRelease) return;
 
   let current = resolvedPackageRoot;
   let installedNodeModulesRoot: string | null = null;
@@ -211,6 +213,8 @@ function packageCurrentGatewayRelease(
   }
   const releaseRoot = buildGatewayReleasePath(versionId, projectsRoot);
   const manifestPath = buildGatewayReleaseManifestPath(versionId, projectsRoot);
+  // TODO: Split publish packaging modes explicitly instead of inferring
+  // repo/workspace vs installed-package mode from pnpm-workspace.yaml.
   if (!existsSync(resolve(repoRoot, "pnpm-workspace.yaml"))) {
     copyInstalledCliPackageRelease(packageRoot, releaseRoot);
     writeGatewayReleaseManifest(manifestPath, {
@@ -262,6 +266,11 @@ export async function runGateway(args: GatewayArgs, deps: RunGatewayDeps = {}): 
     const gatewayRoot = buildGatewayRoot(projectsRoot);
     const distDir = ensureSharedGatewayDist(gatewayRoot);
     const portalAssetsRoot = buildPortalAssetsRoot(projectsRoot);
+    const configPath = args.config ? resolve(args.config) : buildDeployConfigPath(projectsRoot);
+    const config = loadResolvedConfig({
+      config: configPath,
+      configExplicit: Boolean(args.config),
+    });
     try {
       const seeded = (deps.seedPortalAssets ?? seedPortalAssets)(portalAssetsRoot);
       if (seeded.seeded.length > 0) {
@@ -278,13 +287,14 @@ export async function runGateway(args: GatewayArgs, deps: RunGatewayDeps = {}): 
       port: args.port,
       token: null,
       noOpen: args.noOpen,
-      config: args.config ? resolve(args.config) : buildDeployConfigPath(projectsRoot),
+      config: configPath,
       configExplicit: Boolean(args.config),
       serveProfile: args.serveProfile,
       portal: true,
       projectRoute: true,
       registryPath: buildGatewayRegistryPath(projectsRoot),
       portalAssetsRoot,
+      portalAssetsSubdir: config.gateway?.portalAssetsSubdir ?? null,
       projectsConfigPath: buildProjectsConfigPath(projectsRoot),
       pluginRoot: null,
       rebuildDashboard: false,

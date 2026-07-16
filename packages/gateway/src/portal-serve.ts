@@ -44,7 +44,12 @@ export function tryServePortal(
   const portalPath = options.portalPath ?? "/";
 
   if (options.assetsDir && url.pathname.startsWith(PORTAL_ASSET_ROUTE_PREFIX)) {
-    return tryServePortalAsset(res, url.pathname, options.assetsDir);
+    return tryServePortalAsset(
+      res,
+      url.pathname,
+      options.assetsDir,
+      options.portalAssetsSubdir,
+    );
   }
 
   if (url.pathname !== portalPath) return false;
@@ -60,6 +65,7 @@ export function tryServePortal(
     iconUrlFor: options.iconUrlFor,
     projectsConfigPath: options.projectsConfigPath,
     portalAssetsRoot: options.portalAssetsRoot,
+    portalAssetsSubdir: options.portalAssetsSubdir,
     readVersionState: options.readVersionState,
     readProjectsConfig: options.readProjectsConfig,
   });

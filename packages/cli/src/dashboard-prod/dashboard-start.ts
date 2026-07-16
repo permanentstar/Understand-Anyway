@@ -86,6 +86,8 @@ export interface DashboardStartArgs {
    * truth crosses the IPC boundary.
    */
   portalAssetsRoot?: string | null;
+  /** Optional relative subdir under `<projectsRoot>/gateway/portal-assets/`. */
+  portalAssetsSubdir?: string | null;
   /** Two-tier convention: pre-resolved `<projectsRoot>/gateway/config/projects.json`. */
   projectsConfigPath?: string | null;
   /** When set, ensure dashboard-dist/ exists by patching + building from this upstream plugin root. */
@@ -136,6 +138,11 @@ function resolveOptionalPath(path: string | null | undefined): string | null {
   return path ? resolve(path) : null;
 }
 
+function normalizeOptionalSubdir(path: string | null | undefined): string | null {
+  const normalized = String(path ?? "").trim().replaceAll("\\", "/").replace(/^\/+|\/+$/g, "");
+  return normalized || null;
+}
+
 function forwardedConfigPath(args: Pick<DashboardStartArgs, "config" | "configExplicit">): string | null {
   return args.config && args.configExplicit !== false ? args.config : null;
 }
@@ -166,6 +173,7 @@ export function shouldReuseDashboard(
   if (resolveOptionalPath(existing.metadata?.registryPath) !== resolveOptionalPath(args.registryPath)) return false;
   if (resolveOptionalPath(existing.metadata?.configPath) !== resolveOptionalPath(forwardedConfigPath(args))) return false;
   if (resolveOptionalPath(existing.metadata?.portalAssetsRoot) !== resolveOptionalPath(args.portalAssetsRoot)) return false;
+  if (normalizeOptionalSubdir(existing.metadata?.portalAssetsSubdir) !== normalizeOptionalSubdir(args.portalAssetsSubdir)) return false;
   if (resolveOptionalPath(existing.metadata?.projectsConfigPath) !== resolveOptionalPath(args.projectsConfigPath)) return false;
   return isPidAlive(existing.pid, { isPidAlive: deps.isPidAlive });
 }
@@ -227,6 +235,9 @@ function spawnDaemon(options: SpawnDaemonOptions): Promise<SpawnDaemonResult> {
   // explicit override at the dispatcher level).
   const childEnv = { ...process.env };
   if (args.portalAssetsRoot) childEnv.UA_PORTAL_ASSETS_ROOT = resolve(args.portalAssetsRoot);
+  if (normalizeOptionalSubdir(args.portalAssetsSubdir)) {
+    childEnv.UA_PORTAL_ASSETS_SUBDIR = normalizeOptionalSubdir(args.portalAssetsSubdir) as string;
+  }
   if (args.projectsConfigPath) childEnv.UA_PROJECTS_CONFIG_PATH = resolve(args.projectsConfigPath);
     const derivedConfigPath = optionalDerivedConfigPath(args);
     if (derivedConfigPath && !childEnv.UA_CONFIG && nodeExistsSync(derivedConfigPath)) {
@@ -339,6 +350,7 @@ export async function runDashboardStart(
       registryPath: resolveOptionalPath(args.registryPath),
       configPath: resolveOptionalPath(forwardedConfigPath(args)),
       portalAssetsRoot: resolveOptionalPath(args.portalAssetsRoot),
+      portalAssetsSubdir: normalizeOptionalSubdir(args.portalAssetsSubdir),
       projectsConfigPath: resolveOptionalPath(args.projectsConfigPath),
     },
   };

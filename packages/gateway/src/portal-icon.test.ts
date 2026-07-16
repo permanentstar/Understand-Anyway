@@ -65,10 +65,41 @@ describe("resolveProjectIconUrl", () => {
     expect(resolveProjectIconUrl({ projectId: "alpha", portalAssetsRoot })).toBeUndefined();
   });
 
+  it("keeps OSS routes unchanged when portalAssetsSubdir is unset", () => {
+    writeFileSync(join(iconsDir, "alpha.svg"), "<svg/>", "utf8");
+    const url = resolveProjectIconUrl({ projectId: "alpha", portalAssetsRoot });
+    expect(url).toMatch(/^\/portal-assets\/icons\/alpha\.svg\?v=\d+$/);
+    expect(url).not.toContain("/overlay/");
+  });
+
   it("falls back to the root generic.svg when no project-specific icon exists", () => {
     writeFileSync(join(portalAssetsRoot, "generic.svg"), "<svg/>", "utf8");
     const url = resolveProjectIconUrl({ projectId: "alpha", portalAssetsRoot });
     expect(url).toMatch(/^\/portal-assets\/generic\.svg\?v=\d+$/);
+  });
+
+  it("resolves project icons from a configured relative subdir", () => {
+    const overlayIconsDir = join(portalAssetsRoot, "overlay", "icons");
+    mkdirSync(overlayIconsDir, { recursive: true });
+    writeFileSync(join(overlayIconsDir, "alpha.svg"), "<svg/>", "utf8");
+    const url = resolveProjectIconUrl({
+      projectId: "alpha",
+      portalAssetsRoot,
+      portalAssetsSubdir: "overlay",
+    });
+    expect(url).toMatch(/^\/portal-assets\/overlay\/icons\/alpha\.svg\?v=\d+$/);
+  });
+
+  it("falls back to the configured subdir generic asset", () => {
+    const overlayRoot = join(portalAssetsRoot, "overlay");
+    mkdirSync(overlayRoot, { recursive: true });
+    writeFileSync(join(overlayRoot, "generic.svg"), "<svg/>", "utf8");
+    const url = resolveProjectIconUrl({
+      projectId: "alpha",
+      portalAssetsRoot,
+      portalAssetsSubdir: "overlay",
+    });
+    expect(url).toMatch(/^\/portal-assets\/overlay\/generic\.svg\?v=\d+$/);
   });
 
   it("returns undefined when portalAssetsRoot is missing", () => {
@@ -122,6 +153,15 @@ describe("resolveNamedPortalAssetUrl", () => {
   it("returns undefined when baseName is blank", () => {
     writeFileSync(join(portalAssetsRoot, "portal-background.png"), "PNG", "utf8");
     expect(resolveNamedPortalAssetUrl(portalAssetsRoot, "")).toBeUndefined();
+  });
+
+  it("resolves named assets from a configured relative subdir", () => {
+    const overlayRoot = join(portalAssetsRoot, "overlay");
+    mkdirSync(overlayRoot, { recursive: true });
+    writeFileSync(join(overlayRoot, "portal-background.png"), "PNG", "utf8");
+    expect(
+      resolveNamedPortalAssetUrl(portalAssetsRoot, "portal-background", "overlay"),
+    ).toMatch(/^\/portal-assets\/overlay\/portal-background\.png\?v=\d+$/);
   });
 
   it("resolves a root-level named asset with a cache-busting mtime", () => {
@@ -187,6 +227,25 @@ describe("resolvePortalAssetFsPath", () => {
     );
     expect(abs).toBe(join(iconsDir, "alpha.svg"));
   });
+
+  it("maps configured subdir requests to files under that subdir", () => {
+    const abs = resolvePortalAssetFsPath(
+      `${PORTAL_ASSET_ROUTE_PREFIX}overlay/icons/alpha.svg`,
+      portalAssetsRoot,
+      "overlay",
+    );
+    expect(abs).toBe(join(portalAssetsRoot, "overlay", "icons", "alpha.svg"));
+  });
+
+  it("rejects root-level asset requests when a subdir is configured", () => {
+    expect(
+      resolvePortalAssetFsPath(
+        `${PORTAL_ASSET_ROUTE_PREFIX}icons/alpha.svg`,
+        portalAssetsRoot,
+        "overlay",
+      ),
+    ).toBeNull();
+  });
 });
 
 describe("tryServePortalAsset", () => {
@@ -244,20 +303,36 @@ describe("tryServePortalAsset", () => {
     expect(String(res.body)).toBe("<svg></svg>");
   });
 
-    it("does not serve symlinked assets outside portalAssetsRoot", () => {
-      const outside = join(rootDir, "outside.svg");
-      writeFileSync(outside, "<svg>secret</svg>", "utf8");
-      symlinkSync(outside, join(iconsDir, "linked.svg"));
-      const res = fakeRes();
+  it("serves configured subdir assets only from that subdir", () => {
+    const overlayIconsDir = join(portalAssetsRoot, "overlay", "icons");
+    mkdirSync(overlayIconsDir, { recursive: true });
+    writeFileSync(join(overlayIconsDir, "alpha.svg"), "<svg>overlay</svg>", "utf8");
+    const res = fakeRes();
+    const handled = tryServePortalAsset(
+      asRes(res),
+      `${PORTAL_ASSET_ROUTE_PREFIX}overlay/icons/alpha.svg`,
+      portalAssetsRoot,
+      "overlay",
+    );
+    expect(handled).toBe(true);
+    expect(res.statusCode).toBe(200);
+    expect(String(res.body)).toContain("overlay");
+  });
 
-      const handled = tryServePortalAsset(
-        asRes(res),
-        `${PORTAL_ASSET_ROUTE_PREFIX}icons/linked.svg`,
-        portalAssetsRoot,
-      );
+  it("does not serve symlinked assets outside portalAssetsRoot", () => {
+    const outside = join(rootDir, "outside.svg");
+    writeFileSync(outside, "<svg>secret</svg>", "utf8");
+    symlinkSync(outside, join(iconsDir, "linked.svg"));
+    const res = fakeRes();
 
-      expect(handled).toBe(false);
-      expect(res.statusCode).toBe(0);
-      expect(String(res.body)).not.toContain("secret");
-    });
+    const handled = tryServePortalAsset(
+      asRes(res),
+      `${PORTAL_ASSET_ROUTE_PREFIX}icons/linked.svg`,
+      portalAssetsRoot,
+    );
+
+    expect(handled).toBe(false);
+    expect(res.statusCode).toBe(0);
+    expect(String(res.body)).not.toContain("secret");
+  });
 });

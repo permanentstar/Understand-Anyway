@@ -45,9 +45,9 @@ export type EmbeddingProviderFactory = (config: unknown) => EmbeddingProvider | 
 
 export type NotifyProviderFactory = (config: unknown) => NotifyProvider | Promise<NotifyProvider>;
 
-/** What a portal-assets package contributes: a dir to mount + the asset URL map. */
+/** What a portal-assets package contributes: an optional asset dir + the asset URL map. */
 export interface PortalAssetsContribution {
-  /** Directory served under the portal asset route prefix. */
+  /** Optional directory containing related asset files, when the deployment uses them. */
   assetsDir?: string;
   /** Asset URL map injected into the portal view. */
   assets?: PortalAssets;

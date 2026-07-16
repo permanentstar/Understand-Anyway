@@ -40,6 +40,8 @@ export interface DashboardPidInfo {
     configPath?: string | null;
     /** Two-tier portal convention: `<projectsRoot>/gateway/portal-assets/`. */
     portalAssetsRoot?: string | null;
+    /** Optional relative subdir under `<projectsRoot>/gateway/portal-assets/`. */
+    portalAssetsSubdir?: string | null;
     /** Two-tier portal convention: `<projectsRoot>/gateway/config/projects.json`. */
     projectsConfigPath?: string | null;
   };

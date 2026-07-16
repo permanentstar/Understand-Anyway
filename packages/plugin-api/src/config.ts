@@ -55,6 +55,8 @@ export interface DeployConfig {
 /** Shared gateway runtime defaults. */
 export interface GatewayConfig {
   retain?: number;
+  /** Optional relative subdir under `<projectsRoot>/gateway/portal-assets/`. */
+  portalAssetsSubdir?: string;
 }
 
 /** A single dynamically-loaded provider: package name + opaque factory config. */

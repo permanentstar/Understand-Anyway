@@ -190,6 +190,20 @@ describe("assemblePortalView", () => {
     expect(view.projects.find((p) => p.id === "beta")?.iconUrl).toBeUndefined();
   });
 
+  it("resolves icon urls from the configured asset subdir", () => {
+    new ProjectRegistryStore(registryPath).upsert("alpha", "/r/a", "/s/a", { name: "Alpha" });
+    const portalAssetsRoot = join(dir, "portal-assets");
+    mkdirSync(join(portalAssetsRoot, "overlay", "icons"), { recursive: true });
+    writeFileSync(join(portalAssetsRoot, "overlay", "icons", "alpha.svg"), "<svg/>", "utf8");
+    const view = assemblePortalView({
+      registryPath,
+      portalAssetsRoot,
+      portalAssetsSubdir: "overlay",
+      readVersionState: () => emptyVersionState(),
+    });
+    expect(view.projects[0]?.iconUrl).toMatch(/^\/portal-assets\/overlay\/icons\/alpha\.svg\?v=\d+$/);
+  });
+
   it("prefers explicit iconUrlFor over portalAssetsRoot convention", () => {
     new ProjectRegistryStore(registryPath).upsert("alpha", "/r/a", "/s/a", { name: "Alpha" });
     const portalAssetsRoot = join(dir, "portal-assets");
@@ -234,6 +248,26 @@ describe("assemblePortalView brand assets (convention)", () => {
     expect(view.assets?.wordmark).toMatch(/^\/portal-assets\/portal-wordmark\.png\?v=\d+$/);
     expect(view.assets?.footerLeft).toMatch(/^\/portal-assets\/footer-left\.png\?v=\d+$/);
     expect(view.assets?.footerRight).toMatch(/^\/portal-assets\/footer-right\.png\?v=\d+$/);
+  });
+
+  it("fills brand assets from the configured asset subdir", () => {
+    const portalAssetsRoot = join(dir, "portal-assets");
+    const overlayRoot = join(portalAssetsRoot, "overlay");
+    mkdirSync(overlayRoot, { recursive: true });
+    writeFileSync(join(overlayRoot, "portal-background.png"), "PNG", "utf8");
+    writeFileSync(join(overlayRoot, "portal-wordmark.png"), "PNG", "utf8");
+    writeFileSync(join(overlayRoot, "footer-left.png"), "PNG", "utf8");
+    writeFileSync(join(overlayRoot, "footer-right.png"), "PNG", "utf8");
+    const view = assemblePortalView({
+      registryPath,
+      portalAssetsRoot,
+      portalAssetsSubdir: "overlay",
+      readVersionState: () => emptyVersionState(),
+    });
+    expect(view.assets?.pageBackground).toMatch(/^\/portal-assets\/overlay\/portal-background\.png\?v=\d+$/);
+    expect(view.assets?.wordmark).toMatch(/^\/portal-assets\/overlay\/portal-wordmark\.png\?v=\d+$/);
+    expect(view.assets?.footerLeft).toMatch(/^\/portal-assets\/overlay\/footer-left\.png\?v=\d+$/);
+    expect(view.assets?.footerRight).toMatch(/^\/portal-assets\/overlay\/footer-right\.png\?v=\d+$/);
   });
 
   it("omits brand asset fields when no convention file exists", () => {

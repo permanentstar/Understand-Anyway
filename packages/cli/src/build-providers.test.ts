@@ -117,21 +117,42 @@ describe("buildProviders", () => {
       config,
       registryPath: "/r/registry.json",
       portalDisplay: { title: "My Portal" },
+      portalAssetsRoot: "/projects/gateway/portal-assets",
       importModule: importer({ "pkg-assets": fakePortalAssetsModule }),
     });
     expect(built.portal?.registryPath).toBe("/r/registry.json");
     expect(built.portal?.title).toBe("My Portal");
     expect(built.portal?.assetsDir).toBe("/assets/nebula");
     expect(built.portal?.assets?.background).toBe("/portal-assets/bg.png");
+    expect(built).not.toHaveProperty("portalAssetSourceDir");
+  });
+
+  it("does not apply portalAssetsSubdir to provider-contributed assetsDir", async () => {
+    const config: ResolvedConfig = {
+      providers: { portalAssets: { package: "pkg-assets", config: { routePrefix: "/portal-assets/" } } },
+    };
+    const built = await buildProviders(serveArgs({ portal: true }), {
+      config,
+      registryPath: "/r/registry.json",
+      portalAssetsRoot: "/projects/gateway/portal-assets",
+      portalAssetsSubdir: "overlay",
+      importModule: importer({ "pkg-assets": fakePortalAssetsModule }),
+    });
+
+    expect(built.portal?.assetsDir).toBe("/assets/nebula");
+    expect(built.portal?.portalAssetsSubdir).toBeUndefined();
   });
 
   it("assembles portal options without assets when no portal-assets package", async () => {
     const built = await buildProviders(serveArgs({ portal: true }), {
       config: {},
       registryPath: "/r/registry.json",
+      portalAssetsRoot: "/projects/gateway/portal-assets",
+      portalAssetsSubdir: "overlay",
     });
     expect(built.portal?.registryPath).toBe("/r/registry.json");
-    expect(built.portal?.assetsDir).toBeUndefined();
+    expect(built.portal?.assetsDir).toBe("/projects/gateway/portal-assets");
+    expect(built.portal?.portalAssetsSubdir).toBe("overlay");
     expect(built.portal?.assets).toBeUndefined();
   });
 
