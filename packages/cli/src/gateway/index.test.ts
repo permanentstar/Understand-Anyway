@@ -150,6 +150,66 @@ describe("runGateway publish", () => {
   });
 });
 
+describe("runGateway start seeding", () => {
+  let projectsRoot: string | null = null;
+
+  afterEach(() => {
+    if (projectsRoot) rmSync(projectsRoot, { recursive: true, force: true });
+    projectsRoot = null;
+  });
+
+  it("seeds portal assets before starting the dashboard and logs seeded files", async () => {
+    projectsRoot = mkdtempSync(resolve(tmpdir(), "ua-gateway-start-seed-"));
+    const seenRoots: string[] = [];
+    const logs: string[] = [];
+    let startCalled = false;
+
+    await runGateway({
+      command: "gateway",
+      action: "start",
+      projectsRoot,
+      host: "127.0.0.1",
+      port: 0,
+      noOpen: true,
+      config: null,
+      serveProfile: null,
+    }, {
+      log: (message) => logs.push(message),
+      seedPortalAssets: (root) => {
+        seenRoots.push(root);
+        return { seeded: ["portal-background.png", "footer-left.png"] };
+      },
+      startDeps: {
+        // Stub the daemon launcher so no real process spawns.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        spawn: (() => {
+          startCalled = true;
+          const child: any = {
+            pid: 4242,
+            on(event: string, cb: (...a: unknown[]) => void) {
+              if (event === "message") {
+                setImmediate(() =>
+                  cb({ type: "dashboard-ready", host: "127.0.0.1", port: 18690, url: "http://127.0.0.1:18690/?token=x" }),
+                );
+              }
+              return child;
+            },
+            removeAllListeners() { return child; },
+            disconnect() {},
+            unref() {},
+            kill() {},
+          };
+          return child;
+        }) as never,
+      },
+    });
+
+    expect(seenRoots).toEqual([resolve(projectsRoot, "gateway", "portal-assets")]);
+    expect(startCalled).toBe(true);
+    expect(logs.some((l) => l.includes("seeded default assets") && l.includes("portal-background.png"))).toBe(true);
+  });
+});
+
 describe("runGateway gc", () => {
   let projectsRoot: string | null = null;
 

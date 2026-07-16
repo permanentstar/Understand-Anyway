@@ -27,6 +27,24 @@ import {
   type RetryPolicy,
 } from "./llm-retry.js";
 
+/**
+ * Prepend a task-level output-language directive to an upstream-authored prompt.
+ *
+ * Upstream `@understand-anything/core` prompts are English-only and Understand-
+ * Anyway never rewrites them. Output language is a task-level concern owned by
+ * the build orchestration (like model selection), so we wrap — not edit — the
+ * prompt: for `zh*` we prepend an instruction to answer descriptive values in
+ * Chinese while keeping the JSON shape and English keys intact; for any other
+ * language the prompt is returned verbatim. The provider stays prompt-agnostic.
+ */
+export function applyLanguageDirective(prompt: string, outputLanguage: string | undefined): string {
+  if (!outputLanguage || !outputLanguage.toLowerCase().startsWith("zh")) return prompt;
+  const directive =
+    "请用简体中文填写所有描述性文本字段（如摘要、描述、标题、说明等）。" +
+    "务必保持 JSON 结构、字段键名和枚举值（如 simple/moderate/complex）不变，仅将取值中的自然语言描述翻译为中文。\n\n";
+  return `${directive}${prompt}`;
+}
+
 /** Per-file analysis shape, mirroring upstream `parseFileAnalysisResponse`. */
 export interface LLMFileAnalysis {
   fileSummary: string;
@@ -146,10 +164,11 @@ export interface RunLlmFileAnalysisOptions {
   modelCandidates?: string[];
   /** Cooldown applied to a model after a retryable task failure. Defaults to 60s. */
   modelCooldownMs?: number;
+  /** Output language for LLM-authored text; `zh*` prepends a Chinese directive. */
+  outputLanguage?: string;
   /** Test seam: injectable sleep/random/now for the retry layer. */
   retryDeps?: CallWithRetryDeps;
 }
-
 export interface LlmFileAnalysisRun {
   analyses: Map<string, LLMFileAnalysis>;
   stats: LlmBuildStats;
@@ -186,6 +205,8 @@ export interface RunLlmGraphEnhancementOptions {
   timeoutMs?: number;
   retryPolicy?: RetryPolicy;
   modelCandidates?: string[];
+  /** Output language for LLM-authored text; `zh*` prepends a Chinese directive. */
+  outputLanguage?: string;
   retryDeps?: CallWithRetryDeps;
 }
 
@@ -297,7 +318,7 @@ export async function runLlmFileAnalysis(options: RunLlmFileAnalysisOptions): Pr
     let caught: unknown;
     try {
       const content = options.readFile(`${options.analysisRoot}/${filePath}`);
-      const prompt = buildPrompt(filePath, content, options.projectContext);
+      const prompt = applyLanguageDirective(buildPrompt(filePath, content, options.projectContext), options.outputLanguage);
       artifacts.promptStubs.push({ operation: "file-analysis", target: filePath, prompt });
       const parsed = await callWithRetry(
         async () => {
@@ -568,7 +589,7 @@ async function runBatchFileAnalysisTask(
   const attemptLogs: RetryAttemptLog[] = [];
   let parsed: Array<{ filePath: string; analysis: LLMFileAnalysis }> = [];
   let caught: unknown;
-  const prompt = buildBatchFileAnalysisPrompt(options.files, options);
+  const prompt = applyLanguageDirective(buildBatchFileAnalysisPrompt(options.files, options), options.outputLanguage);
   options.artifacts.promptStubs.push({
     operation: "file-analysis-batch",
     target: options.files.map((file) => file.path).join(","),
@@ -741,9 +762,12 @@ export async function runLlmGraphEnhancement(
     const attemptLogs: RetryAttemptLog[] = [];
     let parsed: any;
     let caught: unknown;
-    const prompt = spec.buildPrompt
-      ? spec.buildPrompt(graph, buildPrompt, options)
-      : buildPrompt(graph, options.projectContext);
+    const prompt = applyLanguageDirective(
+      spec.buildPrompt
+        ? spec.buildPrompt(graph, buildPrompt, options)
+        : buildPrompt(graph, options.projectContext),
+      options.outputLanguage,
+    );
     artifacts.promptStubs.push({ operation: spec.stage, prompt });
     try {
       parsed = await callWithRetry(

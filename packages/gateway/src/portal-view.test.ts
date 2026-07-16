@@ -216,3 +216,50 @@ describe("assemblePortalView", () => {
     expect(view.projects[0]?.buildVersionIsStable).toBe(false);
   });
 });
+
+describe("assemblePortalView brand assets (convention)", () => {
+  it("fills pageBackground/wordmark/footer avatars from portalAssetsRoot by convention", () => {
+    const portalAssetsRoot = join(dir, "portal-assets");
+    mkdirSync(portalAssetsRoot, { recursive: true });
+    writeFileSync(join(portalAssetsRoot, "portal-background.png"), "PNG", "utf8");
+    writeFileSync(join(portalAssetsRoot, "portal-wordmark.png"), "PNG", "utf8");
+    writeFileSync(join(portalAssetsRoot, "footer-left.png"), "PNG", "utf8");
+    writeFileSync(join(portalAssetsRoot, "footer-right.png"), "PNG", "utf8");
+    const view = assemblePortalView({
+      registryPath,
+      portalAssetsRoot,
+      readVersionState: () => emptyVersionState(),
+    });
+    expect(view.assets?.pageBackground).toMatch(/^\/portal-assets\/portal-background\.png\?v=\d+$/);
+    expect(view.assets?.wordmark).toMatch(/^\/portal-assets\/portal-wordmark\.png\?v=\d+$/);
+    expect(view.assets?.footerLeft).toMatch(/^\/portal-assets\/footer-left\.png\?v=\d+$/);
+    expect(view.assets?.footerRight).toMatch(/^\/portal-assets\/footer-right\.png\?v=\d+$/);
+  });
+
+  it("omits brand asset fields when no convention file exists", () => {
+    const portalAssetsRoot = join(dir, "portal-assets");
+    mkdirSync(portalAssetsRoot, { recursive: true });
+    const view = assemblePortalView({
+      registryPath,
+      portalAssetsRoot,
+      readVersionState: () => emptyVersionState(),
+    });
+    expect(view.assets?.pageBackground).toBeUndefined();
+    expect(view.assets?.wordmark).toBeUndefined();
+    expect(view.assets?.footerLeft).toBeUndefined();
+    expect(view.assets?.footerRight).toBeUndefined();
+  });
+
+  it("prefers explicit assets over the portalAssetsRoot convention", () => {
+    const portalAssetsRoot = join(dir, "portal-assets");
+    mkdirSync(portalAssetsRoot, { recursive: true });
+    writeFileSync(join(portalAssetsRoot, "portal-background.png"), "PNG", "utf8");
+    const view = assemblePortalView({
+      registryPath,
+      portalAssetsRoot,
+      assets: { pageBackground: "https://cdn.example/bg.png" },
+      readVersionState: () => emptyVersionState(),
+    });
+    expect(view.assets?.pageBackground).toBe("https://cdn.example/bg.png");
+  });
+});

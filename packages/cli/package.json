@@ -18,6 +18,7 @@
   "files": [
     "dist",
     "dist-scripts",
+    "assets",
     "deploy.example.yaml",
     "src/config/deploy.schema.json"
   ],

@@ -104,9 +104,15 @@ function renderExtraProjectCard(project: PortalProjectView, soundOffset: number)
 const PLACEHOLDER_ICON =
   "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2092%2092'%3E%3Crect%20width='92'%20height='92'%20rx='20'%20fill='%23123'/%3E%3Ccircle%20cx='46'%20cy='46'%20r='22'%20fill='none'%20stroke='%235cd4ff'%20stroke-width='4'/%3E%3C/svg%3E";
 
+const DEFAULT_PORTAL_LINKS: PortalLinkView[] = [
+  { name: "permanentstar", href: "https://github.com/permanentstar" },
+  { name: "Understand-Anything", href: "https://github.com/Lum1104/Understand-Anything" },
+];
+
 export function renderPortalPage(view: PortalView): string {
   const projects = Array.isArray(view.projects) ? view.projects : [];
   const links = Array.isArray(view.links) ? view.links : [];
+  const footerLinkViews = links.length > 0 ? links : DEFAULT_PORTAL_LINKS;
   const assets = view.assets || {};
   const title = view.title || "Understand Portal";
   const lang = view.lang || "en";
@@ -116,7 +122,20 @@ export function renderPortalPage(view: PortalView): string {
   const overflowProjects = projects.slice(5);
   const primaryCount = Math.max(1, Math.min(primaryProjects.length || 1, 5));
   const deckCountClass = `project-deck-count-${primaryCount}`;
-  const layoutClass = overflowProjects.length > 0 ? "has-overflow" : "no-overflow";
+  const hasPageBackground = Boolean(assets.pageBackground);
+  const layoutClass = [
+    overflowProjects.length > 0 ? "has-overflow" : "no-overflow",
+    hasPageBackground ? "page-background-layout" : "",
+  ].filter(Boolean).join(" ");
+  const deckClass = [
+    "project-deck",
+    deckCountClass,
+    hasPageBackground ? "page-background-deck" : "",
+  ].filter(Boolean).join(" ");
+  const overflowSectionClass = [
+    "overflow-section",
+    hasPageBackground ? "page-background-overflow-section" : "",
+  ].filter(Boolean).join(" ");
 
   const projectCards = primaryProjects.length > 0
     ? primaryProjects.map((project, index) => renderProjectCard(project, index)).join("\n")
@@ -134,8 +153,12 @@ export function renderPortalPage(view: PortalView): string {
     ? `\n      .stage { background: url("${assets.background}") center / contain no-repeat; }`
     : "";
 
+  const pageBackgroundCss = assets.pageBackground
+    ? `\n      body { background: url("${assets.pageBackground}") center / cover no-repeat fixed; }`
+    : "";
+
   const footerAvatars = [assets.footerLeft, assets.footerRight];
-  const footerLinks = links.slice(0, 2).map((link, index) => {
+  const footerLinks = footerLinkViews.slice(0, 2).map((link, index) => {
     const side = index === 0 ? "left" : "right";
     const imageUrl = link.iconUrl || footerAvatars[index] || PLACEHOLDER_ICON;
     return `<a class="footer-github-link footer-github-link-${side}" data-footer-link="${side}" href="${escapeHtml(link.href)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(link.name)}" title="${escapeHtml(link.name)}">
@@ -153,7 +176,7 @@ export function renderPortalPage(view: PortalView): string {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(title)}</title>
-    <style>${PORTAL_STYLES}${stageBackgroundCss}
+    <style>${PORTAL_STYLES}${stageBackgroundCss}${pageBackgroundCss}
     </style>
   </head>
   <body>
@@ -162,12 +185,12 @@ export function renderPortalPage(view: PortalView): string {
       <div class="portal-scroll ${layoutClass}">
         <section class="hero-stage">
           <div class="stage">
-            <section class="project-deck ${deckCountClass}">
+            <section class="${deckClass}">
               ${projectCards}
             </section>
           </div>
         </section>
-        ${overflowProjects.length > 0 ? `<section class="overflow-section">
+        ${overflowProjects.length > 0 ? `<section class="${overflowSectionClass}">
           <div class="overflow-header">
             <h2>Additional Projects</h2>
             <span>${overflowProjects.length} more runtime${overflowProjects.length > 1 ? "s" : ""}</span>

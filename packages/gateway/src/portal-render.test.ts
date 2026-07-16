@@ -55,6 +55,36 @@ describe("renderPortalPage", () => {
     expect(withoutAssets).toContain("footer-wordmark-text");
   });
 
+  it("paints pageBackground on the body (cover) and omits it when absent", () => {
+    const withPageBg = renderPortalPage(baseView({
+      assets: { pageBackground: "/portal-assets/portal-background.png" },
+    }));
+    expect(withPageBg).toContain(
+      'url("/portal-assets/portal-background.png") center / cover no-repeat fixed',
+    );
+    expect(withPageBg).toContain("body {");
+
+    const withoutPageBg = renderPortalPage(baseView());
+    expect(withoutPageBg).not.toContain("portal-background.png");
+  });
+
+  it("uses the non-obstructing page-background layout when a body background is present", () => {
+    const projects = Array.from({ length: 7 }, (_, i) => ({
+      id: `p${i}`,
+      name: `Project ${i}`,
+      href: `/project/p${i}/`,
+    }));
+    const html = renderPortalPage(baseView({
+      projects,
+      assets: { pageBackground: "/portal-assets/portal-background.png" },
+    }));
+
+    expect(html).toContain("portal-scroll has-overflow page-background-layout");
+    expect(html).toContain("project-deck project-deck-count-5 page-background-deck");
+    expect(html).toContain("overflow-section page-background-overflow-section");
+    expect(html).toContain(".portal-scroll.page-background-layout.no-overflow .hero-stage");
+  });
+
   it("renders up to two footer links with provided hrefs", () => {
     const html = renderPortalPage(baseView({
       links: [
@@ -66,6 +96,15 @@ describe("renderPortalPage", () => {
     expect(html).toContain('href="https://example.com/up"');
     expect(html).toContain('href="https://example.com/repo"');
     expect(html).not.toContain("https://example.com/x");
+  });
+
+  it("renders the default footer links when none are configured", () => {
+    const html = renderPortalPage(baseView());
+
+    expect(html).toContain('href="https://github.com/permanentstar"');
+    expect(html).toContain('aria-label="permanentstar"');
+    expect(html).toContain('href="https://github.com/Lum1104/Understand-Anything"');
+    expect(html).toContain('aria-label="Understand-Anything"');
   });
 
   it("escapes untrusted project and link fields", () => {

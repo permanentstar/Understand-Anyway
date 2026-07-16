@@ -1,0 +1,49 @@
+# yaml-language-server: $schema=../packages/cli/src/config/deploy.schema.json
+# PPE live-deploy config (real on-disk file, scp'd to the standard data root).
+#
+# Environment-specific by design: absolute paths and the traex binary location
+# are bound to the PPE host (user suheng.cloud). This is NOT the neutral
+# open-source template — it is the concrete config for the PPE experience box.
+#
+# LLM is driven through the built-in `cli-spawn` provider talking directly to
+# `traex exec` (no shim): `modelArg: -m` injects the orchestration-selected
+# model onto the command line, and traex writes the final answer to stdout.
+
+version: 1
+
+deploy:
+  host: "0.0.0.0"
+  port: 18690
+  outputLanguage: "zh"
+
+gateway:
+  retain: 2
+
+providers:
+  llm:
+    package: "cli-spawn"
+    config:
+      command: "/home/suheng.cloud/.local/bin/traex"
+      args:
+        - "exec"
+        - "--skip-git-repo-check"
+        - "-C"
+        - "/home/suheng.cloud/understand-projects/gateway/.understand-anything/llm-work"
+        - "--dangerously-bypass-approvals-and-sandbox"
+        - "--ephemeral"
+      modelArg: "-m"
+      model: "Qwen3.6-Plus"
+      promptMode: "arg"
+
+record:
+  providers: ["local"]
+
+profiles:
+  small:
+    use: [llm]
+    build:
+      mode: "full"
+      excludeTests: true
+      outputLanguage: "zh"
+      llmAnalysis: true
+      llmRequired: false

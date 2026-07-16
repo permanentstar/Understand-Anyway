@@ -34,6 +34,7 @@ import {
 } from "../projects-config.js";
 import { runDashboardStart, type DashboardStartDeps } from "../dashboard-prod/dashboard-start.js";
 import { runDashboardStop, type DashboardStopDeps } from "../dashboard-prod/dashboard-stop.js";
+import { seedPortalAssets, type SeedPortalAssetsResult } from "../portal-assets-seed.js";
 
 export interface RunGatewayDeps {
   versioningDeps?: GatewayVersioningDeps;
@@ -41,6 +42,8 @@ export interface RunGatewayDeps {
   stopDeps?: DashboardStopDeps;
   cliEntry?: string;
   log?: (message: string) => void;
+  /** Override the portal-asset seeder (tests). */
+  seedPortalAssets?: (portalAssetsRoot: string) => SeedPortalAssetsResult;
 }
 
 function resolveCliDistDir(): string {
@@ -247,6 +250,15 @@ export async function runGateway(args: GatewayArgs, deps: RunGatewayDeps = {}): 
   if (args.action === "start") {
     const gatewayRoot = buildGatewayRoot(projectsRoot);
     const distDir = ensureSharedGatewayDist(gatewayRoot);
+    const portalAssetsRoot = buildPortalAssetsRoot(projectsRoot);
+    try {
+      const seeded = (deps.seedPortalAssets ?? seedPortalAssets)(portalAssetsRoot);
+      if (seeded.seeded.length > 0) {
+        log(`portal: seeded default assets (${seeded.seeded.join(", ")})`);
+      }
+    } catch (err) {
+      log(`portal: default asset seeding skipped (${(err as Error).message})`);
+    }
     await runDashboardStart({
       stateDir: gatewayRoot,
       distDir,
@@ -261,7 +273,7 @@ export async function runGateway(args: GatewayArgs, deps: RunGatewayDeps = {}): 
       portal: true,
       projectRoute: true,
       registryPath: buildGatewayRegistryPath(projectsRoot),
-      portalAssetsRoot: buildPortalAssetsRoot(projectsRoot),
+      portalAssetsRoot,
       projectsConfigPath: buildProjectsConfigPath(projectsRoot),
       pluginRoot: null,
       rebuildDashboard: false,

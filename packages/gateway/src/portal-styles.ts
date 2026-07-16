@@ -217,4 +217,81 @@ export const PORTAL_STYLES = `
         .footer-wordmark { height: auto; width: min(320px, 72vw); }
       }
       @media (max-width: 560px) { .extra-projects { grid-template-columns: 1fr; } }
+
+      /*
+       * Body-background art already carries the hero title/composition. Keep
+       * project navigation out of the visual center so it does not cover the
+       * rendered "Understand" wordmark in the default OSS background.
+       */
+      .page-background-layout .hero-stage {
+        min-height: clamp(580px, 80vh, 840px);
+        align-items: flex-end;
+        padding-bottom: 18px;
+      }
+      .portal-scroll.page-background-layout.no-overflow .hero-stage {
+        min-height: clamp(650px, 82vh, 900px);
+        padding-bottom: 18px;
+      }
+      .page-background-layout .stage {
+        width: min(1120px, calc(100vw - 32px));
+        max-width: 1120px;
+        aspect-ratio: auto;
+      }
+      .page-background-layout .project-deck {
+        position: relative;
+        left: auto;
+        top: auto;
+        transform: none;
+        width: min(920px, 78vw);
+        margin: 0 auto;
+      }
+      .page-background-layout .project-deck-count-1 { width: min(160px, 78vw); }
+      .page-background-layout .project-deck-count-2 { width: min(328px, 78vw); }
+      .page-background-layout .project-deck-count-3 { width: min(496px, 78vw); }
+      .page-background-layout .project-deck-count-4 { width: min(664px, 78vw); }
+      .page-background-layout .project-deck-count-5 { width: min(840px, 78vw); }
+      .page-background-layout .project-card {
+        min-height: 138px;
+        padding: 10px 12px 12px;
+        border-radius: 24px;
+      }
+      .page-background-layout .project-logo {
+        width: 64px;
+        height: 64px;
+        margin: 4px auto 2px;
+        border-radius: 18px;
+      }
+      .page-background-layout .project-logo-image {
+        width: 48px;
+        height: 48px;
+      }
+      .page-background-layout .project-card strong { font-size: 14px; }
+      .page-background-layout .project-card small { font-size: 10px; }
+      .page-background-overflow-section {
+        margin: 14px auto 0;
+        background: rgba(4, 11, 29, 0.34);
+        backdrop-filter: blur(10px) saturate(128%);
+      }
+      @media (max-width: 960px) {
+        .page-background-layout .hero-stage {
+          min-height: clamp(560px, 78vh, 760px);
+          padding-bottom: 14px;
+        }
+        .page-background-layout .project-deck {
+          width: min(92vw, 760px);
+          gap: 10px;
+        }
+        .page-background-layout .project-card {
+          min-height: 126px;
+          padding-inline: 10px;
+        }
+      }
+      @media (max-width: 820px) {
+        .page-background-layout .project-deck {
+          position: relative;
+          width: min(100%, 520px);
+          padding-top: 0;
+        }
+        .page-background-layout .project-card { min-height: 150px; }
+      }
 `;

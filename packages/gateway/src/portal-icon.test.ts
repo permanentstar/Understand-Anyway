@@ -6,6 +6,7 @@ import type { ServerResponse } from "node:http";
 import {
   PORTAL_ASSET_ROUTE_PREFIX,
   PORTAL_ICON_EXTENSIONS,
+  resolveNamedPortalAssetUrl,
   resolvePortalAssetFsPath,
   resolveProjectIconUrl,
   tryServePortalAsset,
@@ -64,6 +65,12 @@ describe("resolveProjectIconUrl", () => {
     expect(resolveProjectIconUrl({ projectId: "alpha", portalAssetsRoot })).toBeUndefined();
   });
 
+  it("falls back to the root generic.svg when no project-specific icon exists", () => {
+    writeFileSync(join(portalAssetsRoot, "generic.svg"), "<svg/>", "utf8");
+    const url = resolveProjectIconUrl({ projectId: "alpha", portalAssetsRoot });
+    expect(url).toMatch(/^\/portal-assets\/generic\.svg\?v=\d+$/);
+  });
+
   it("returns undefined when portalAssetsRoot is missing", () => {
     expect(resolveProjectIconUrl({ projectId: "alpha" })).toBeUndefined();
   });
@@ -100,6 +107,47 @@ describe("resolveProjectIconUrl", () => {
     const expectedMtime = Math.trunc(fixed.getTime());
     const url = resolveProjectIconUrl({ projectId: "gamma", portalAssetsRoot });
     expect(url).toBe(`/portal-assets/icons/gamma.svg?v=${expectedMtime}`);
+  });
+});
+
+describe("resolveNamedPortalAssetUrl", () => {
+  it("returns undefined when no convention file is on disk", () => {
+    expect(resolveNamedPortalAssetUrl(portalAssetsRoot, "portal-background")).toBeUndefined();
+  });
+
+  it("returns undefined when portalAssetsRoot is blank", () => {
+    expect(resolveNamedPortalAssetUrl("", "portal-background")).toBeUndefined();
+  });
+
+  it("returns undefined when baseName is blank", () => {
+    writeFileSync(join(portalAssetsRoot, "portal-background.png"), "PNG", "utf8");
+    expect(resolveNamedPortalAssetUrl(portalAssetsRoot, "")).toBeUndefined();
+  });
+
+  it("resolves a root-level named asset with a cache-busting mtime", () => {
+    const file = join(portalAssetsRoot, "portal-background.png");
+    writeFileSync(file, "PNG", "utf8");
+    const fixed = new Date(2024, 0, 1);
+    utimesSync(file, fixed, fixed);
+    const expectedMtime = Math.trunc(fixed.getTime());
+    expect(resolveNamedPortalAssetUrl(portalAssetsRoot, "portal-background")).toBe(
+      `/portal-assets/portal-background.png?v=${expectedMtime}`,
+    );
+  });
+
+  it("hits the highest-priority extension first", () => {
+    writeFileSync(join(portalAssetsRoot, "portal-wordmark.svg"), "<svg/>", "utf8");
+    writeFileSync(join(portalAssetsRoot, "portal-wordmark.png"), "PNG", "utf8");
+    expect(resolveNamedPortalAssetUrl(portalAssetsRoot, "portal-wordmark")).toMatch(
+      /^\/portal-assets\/portal-wordmark\.svg\?v=\d+$/,
+    );
+  });
+
+  it("falls through to the next extension when a higher one is missing", () => {
+    writeFileSync(join(portalAssetsRoot, "footer-left.png"), "PNG", "utf8");
+    expect(resolveNamedPortalAssetUrl(portalAssetsRoot, "footer-left")).toMatch(
+      /^\/portal-assets\/footer-left\.png\?v=\d+$/,
+    );
   });
 });
 

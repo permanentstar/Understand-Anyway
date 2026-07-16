@@ -92,6 +92,7 @@ export {
 export {
   PORTAL_ASSET_ROUTE_PREFIX,
   PORTAL_ICON_EXTENSIONS,
+  resolveNamedPortalAssetUrl,
   resolveProjectIconUrl,
   resolvePortalAssetFsPath,
   tryServePortalAsset,

@@ -416,6 +416,7 @@ export async function runFullBuild(
         retryPolicy: options.llm.retryPolicy,
         modelCandidates: options.llm.modelCandidates,
         modelCooldownMs: options.llm.modelCooldownMs,
+        outputLanguage,
       });
       llmAnalyses = llmRun.analyses;
       const llmDir = resolve(stateRoot, UA_DIR, "llm");
@@ -498,6 +499,7 @@ export async function runFullBuild(
       timeoutMs: options.llm.timeoutMs,
       retryPolicy: options.llm.retryPolicy,
       modelCandidates: options.llm.modelCandidates,
+      outputLanguage,
     });
     graph = graphLlmRun.graph;
     const llmDir = resolve(stateRoot, UA_DIR, "llm");

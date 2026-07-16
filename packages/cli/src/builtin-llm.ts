@@ -153,11 +153,19 @@ async function runCliPrompt(options: {
   });
 }
 
+const CLI_SPAWN_DEFAULT_MODEL = "cli-spawn-default";
+
+function shouldPassModel(model: string): boolean {
+  const normalized = model.trim();
+  return normalized.length > 0 && normalized !== CLI_SPAWN_DEFAULT_MODEL;
+}
+
 export class CliSpawnLlmProvider implements LlmProvider {
   readonly name = "cli-spawn";
   private readonly model: string;
   private readonly command: string;
   private readonly args: string[];
+  private readonly modelArg?: string;
   private readonly promptMode: "arg" | "stdin";
   private readonly spawnImpl?: SpawnLike;
 
@@ -165,20 +173,27 @@ export class CliSpawnLlmProvider implements LlmProvider {
     model?: string;
     command?: string;
     args?: string[];
+    modelArg?: string;
     promptMode?: "arg" | "stdin";
     spawnImpl?: SpawnLike;
   }) {
-    this.model = options.model ?? "cli-spawn-default";
+    this.model = options.model ?? CLI_SPAWN_DEFAULT_MODEL;
     this.command = options.command ?? "llm";
     this.args = options.args ?? ["-p", "--output-format", "text"];
+    this.modelArg = options.modelArg?.trim() || undefined;
     this.promptMode = options.promptMode ?? "arg";
     this.spawnImpl = options.spawnImpl;
   }
 
   async complete(request: LlmRequest): Promise<LlmResponse> {
+    const model = request.model ?? this.model;
+    const args = [...this.args];
+    if (this.modelArg && shouldPassModel(model) && !args.includes(this.modelArg)) {
+      args.push(this.modelArg, model);
+    }
     const text = await runCliPrompt({
       command: this.command,
-      args: this.args,
+      args,
       prompt: request.prompt,
       promptMode: this.promptMode,
       timeoutMs: request.timeoutMs ?? 30_000,
@@ -186,7 +201,7 @@ export class CliSpawnLlmProvider implements LlmProvider {
     });
     return {
       text,
-      meta: { provider: this.name, model: this.model },
+      meta: { provider: this.name, model },
     };
   }
 }
@@ -212,6 +227,7 @@ export function createBuiltinLlmProvider(
       model: config.model as string | undefined,
       command: config.command as string | undefined,
       args: Array.isArray(config.args) ? config.args.filter((item): item is string => typeof item === "string") : undefined,
+      modelArg: config.modelArg as string | undefined,
       promptMode: config.promptMode === "stdin" ? "stdin" : "arg",
       spawnImpl: config.spawnImpl as SpawnLike | undefined,
     });

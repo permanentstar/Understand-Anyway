@@ -6,7 +6,9 @@
  *                          first match in {@link PORTAL_ICON_EXTENSIONS}
  *                          wins; the result URL carries an `?v=<mtime>` query
  *                          so browsers re-fetch when the file updates.
- *   Layer 2 (placeholder)  Returns `undefined`, letting the renderer fall
+ *   Layer 2 (generic)      `<portalAssetsRoot>/generic<ext>` — fallback used
+ *                          when a project-specific icon is absent.
+ *   Layer 3 (placeholder)  Returns `undefined`, letting the renderer fall
  *                          back to the inline placeholder SVG.
  *
  * External URLs are intentionally not supported — every icon must be served
@@ -52,10 +54,47 @@ export function resolveProjectIconUrl(
   if (!projectId) return undefined;
   const portalAssetsRoot = options.portalAssetsRoot;
   if (!portalAssetsRoot) return undefined;
+  return resolveConventionAssetUrl(portalAssetsRoot, "icons", projectId)
+    ?? resolveConventionAssetUrl(portalAssetsRoot, "", "generic");
+}
+
+/**
+ * Resolve the public URL of a root-level branded asset by convention name
+ * (`<portalAssetsRoot>/<baseName>.<ext>`, first match in
+ * {@link PORTAL_ICON_EXTENSIONS} wins). Returns `undefined` when no file is on
+ * disk. Used for the neutral portal brand set (background / wordmark / footer
+ * avatars) so the open-source portal is zero-config: dropping a conventionally
+ * named file into `portal-assets/` is enough to light it up.
+ */
+export function resolveNamedPortalAssetUrl(
+  portalAssetsRoot: string,
+  baseName: string,
+): string | undefined {
+  const root = (portalAssetsRoot ?? "").trim();
+  const name = (baseName ?? "").trim();
+  if (!root || !name) return undefined;
+  return resolveConventionAssetUrl(root, "", name);
+}
+
+/**
+ * Shared Layer 1 convention resolver: scan `<root>/<subdir>/<baseName><ext>`
+ * for the first whitelisted extension on disk and return its public URL with a
+ * `?v=<mtime>` cache-buster. `subdir` may be empty for root-level assets.
+ */
+function resolveConventionAssetUrl(
+  portalAssetsRoot: string,
+  subdir: string,
+  baseName: string,
+): string | undefined {
   for (const ext of PORTAL_ICON_EXTENSIONS) {
-    const absolute = resolve(portalAssetsRoot, "icons", `${projectId}${ext}`);
+    const absolute = subdir
+      ? resolve(portalAssetsRoot, subdir, `${baseName}${ext}`)
+      : resolve(portalAssetsRoot, `${baseName}${ext}`);
     if (!existsSync(absolute)) continue;
-    const url = `${PORTAL_ASSET_ROUTE_PREFIX}icons/${encodeURIComponent(projectId)}${ext}`;
+    const routeSuffix = subdir
+      ? `${subdir}/${encodeURIComponent(baseName)}${ext}`
+      : `${encodeURIComponent(baseName)}${ext}`;
+    const url = `${PORTAL_ASSET_ROUTE_PREFIX}${routeSuffix}`;
     try {
       const mtime = Math.trunc(lstatSync(absolute).mtimeMs);
       return Number.isFinite(mtime) && mtime > 0 ? `${url}?v=${mtime}` : url;

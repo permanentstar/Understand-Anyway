@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LlmError } from "@understand-anyway/plugin-api";
-import { runLlmFileAnalysis, runLlmGraphEnhancement } from "./llm.js";
+import { applyLanguageDirective, runLlmFileAnalysis, runLlmGraphEnhancement } from "./llm.js";
 
 const noopRetryDeps = {
   sleep: async () => {},
@@ -608,5 +608,128 @@ describe("runLlmGraphEnhancement", () => {
     expect(result.stats.failed).toBe(1);
     expect(result.stats.failures[0]?.stage).toBe("layers");
     expect(result.graph.layers).toEqual([]);
+  });
+});
+
+describe("applyLanguageDirective", () => {
+  it("prepends a Chinese directive for zh and keeps JSON structure guidance", () => {
+    const out = applyLanguageDirective("PROMPT_BODY", "zh");
+    expect(out).not.toBe("PROMPT_BODY");
+    expect(out.endsWith("PROMPT_BODY")).toBe(true);
+    expect(out).toContain("中文");
+    expect(out).toContain("JSON");
+  });
+
+  it("prepends the directive for any zh-* variant", () => {
+    const out = applyLanguageDirective("BODY", "zh-CN");
+    expect(out.startsWith("BODY")).toBe(false);
+    expect(out.endsWith("BODY")).toBe(true);
+    expect(out).toContain("中文");
+  });
+
+  it("returns the prompt unchanged for en", () => {
+    expect(applyLanguageDirective("BODY", "en")).toBe("BODY");
+  });
+
+  it("returns the prompt unchanged when language is undefined", () => {
+    expect(applyLanguageDirective("BODY", undefined)).toBe("BODY");
+  });
+});
+
+describe("outputLanguage wiring", () => {
+  it("injects the zh directive into file-analysis prompts sent to the provider", async () => {
+    const prompts: string[] = [];
+    await runLlmFileAnalysis({
+      enabled: true,
+      required: false,
+      files: [{ path: "src/a.ts" }],
+      analysisRoot: "/repo",
+      projectContext: "repo",
+      readFile: () => "source",
+      outputLanguage: "zh",
+      provider: {
+        name: "fake",
+        complete: async (request) => {
+          prompts.push(request.prompt);
+          return {
+            text: JSON.stringify({
+              results: [
+                { filePath: "src/a.ts", response: { fileSummary: "A", tags: [], complexity: "simple", functionSummaries: {}, classSummaries: {} } },
+              ],
+            }),
+          };
+        },
+      },
+      core: fakeCore,
+      retryPolicy: noRetryPolicy,
+      retryDeps: noopRetryDeps,
+    });
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).toContain("中文");
+    expect(prompts[0]).toContain("src/a.ts:source:repo");
+    expect(prompts[0]!.endsWith("src/a.ts:source:repo")).toBe(true);
+  });
+
+  it("leaves file-analysis prompts unchanged for en", async () => {
+    const prompts: string[] = [];
+    await runLlmFileAnalysis({
+      enabled: true,
+      required: false,
+      files: [{ path: "src/a.ts" }],
+      analysisRoot: "/repo",
+      projectContext: "repo",
+      readFile: () => "source",
+      outputLanguage: "en",
+      provider: {
+        name: "fake",
+        complete: async (request) => {
+          prompts.push(request.prompt);
+          return {
+            text: JSON.stringify({
+              results: [
+                { filePath: "src/a.ts", response: { fileSummary: "A", tags: [], complexity: "simple", functionSummaries: {}, classSummaries: {} } },
+              ],
+            }),
+          };
+        },
+      },
+      core: fakeCore,
+      retryPolicy: noRetryPolicy,
+      retryDeps: noopRetryDeps,
+    });
+    expect(prompts[0]).not.toContain("中文");
+  });
+
+  it("injects the zh directive into graph-enhancement prompts", async () => {
+    const prompts: string[] = [];
+    const graph = {
+      project: { name: "repo", description: "d", frameworks: [] },
+      nodes: [{ id: "src/a.ts", type: "file", filePath: "src/a.ts" }],
+      edges: [],
+      layers: [],
+      tour: [],
+    };
+    await runLlmGraphEnhancement({
+      enabled: true,
+      required: false,
+      graph,
+      projectContext: "repo",
+      outputLanguage: "zh",
+      provider: {
+        name: "fake",
+        complete: async (request) => {
+          prompts.push(request.prompt);
+          return { text: "bad" };
+        },
+      },
+      core: {
+        buildLayerDetectionPrompt: () => "layer-prompt",
+        parseLayerDetectionResponse: () => null,
+      },
+      retryPolicy: noRetryPolicy,
+      retryDeps: noopRetryDeps,
+    });
+    expect(prompts[0]).toContain("中文");
+    expect(prompts[0]).toContain("layer-prompt");
   });
 });

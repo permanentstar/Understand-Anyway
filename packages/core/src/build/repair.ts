@@ -253,6 +253,7 @@ export async function repairLlmFailures(
     core: options.core,
     timeoutMs: options.llm?.timeoutMs,
     retryPolicy: options.llm?.retryPolicy,
+    outputLanguage,
   });
 
   const analyses: Map<string, LLMFileAnalysis> = llmRun.analyses;
@@ -367,6 +368,7 @@ export async function repairLlmGraphFailures(
     core: options.core,
     timeoutMs: options.llm?.timeoutMs,
     retryPolicy: options.llm?.retryPolicy,
+    outputLanguage: options.outputLanguage ?? "en",
   });
 
   persistValidatedGraph(

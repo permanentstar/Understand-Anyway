@@ -300,6 +300,7 @@ export async function runBatchMapperWorker(
         qpmLimit: args.llmQpmLimit ?? undefined,
         globalConcurrency: args.globalLlmConcurrency ?? undefined,
         modelCandidates: args.llmModelCandidates,
+        outputLanguage: args.outputLanguage,
       });
       llmAnalyses = run.analyses;
     }

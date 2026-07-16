@@ -21,6 +21,12 @@ import type { OrgPolicyProvider } from "./org-policy.js";
 export interface PortalAssets {
   /** Hero stage background image URL. Omitted → gradient-only stage. */
   background?: string;
+  /**
+   * Full-page background image URL, painted on `<body>` beneath the stage and
+   * content (cover-fit). Distinct from {@link background}, which is confined to
+   * the hero `.stage` for stage-composed art. Omitted → gradient-only page.
+   */
+  pageBackground?: string;
   /** Footer wordmark image URL. Omitted → no wordmark image. */
   wordmark?: string;
   /** Default left footer link avatar URL. */

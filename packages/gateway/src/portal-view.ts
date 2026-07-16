@@ -25,7 +25,7 @@ import {
   ProjectRegistryStore,
   type ProjectRegistryRecord,
 } from "./project-registry.js";
-import { resolveProjectIconUrl } from "./portal-icon.js";
+import { resolveNamedPortalAssetUrl, resolveProjectIconUrl } from "./portal-icon.js";
 import {
   readProjectVersionState as defaultReadProjectVersionState,
   type ProjectVersionStateRecord,
@@ -174,8 +174,40 @@ export function assemblePortalView(options: AssemblePortalViewOptions): PortalVi
     title: options.title,
     projects: candidates.map(({ view }) => view),
     links: options.links,
-    assets: options.assets,
+    assets: resolveBrandAssets(options),
     lang: options.lang,
     wordmarkAlt: options.wordmarkAlt,
   };
+}
+
+/**
+ * Convention names for the neutral brand asset set, resolved as
+ * `<portalAssetsRoot>/<name>.<ext>`. Kept in lockstep with the CLI's bundled
+ * `assets/portal/` seed files.
+ */
+const BRAND_ASSET_CONVENTION = {
+  pageBackground: "portal-background",
+  wordmark: "portal-wordmark",
+  footerLeft: "footer-left",
+  footerRight: "footer-right",
+} as const;
+
+/**
+ * Resolve the portal brand assets. Explicit `assets` (overlay-supplied
+ * branding) always win and short-circuit the convention scan, keeping the
+ * open-source convention fully isolated from injected art. When no explicit
+ * assets are given but a `portalAssetsRoot` exists, fill each field from the
+ * `portal-assets/<name>.<ext>` convention; fields with no file on disk are
+ * omitted so the renderer degrades to gradients / text.
+ */
+function resolveBrandAssets(options: AssemblePortalViewOptions): PortalAssets | undefined {
+  if (options.assets) return options.assets;
+  const root = options.portalAssetsRoot;
+  if (!root) return undefined;
+  const assets: PortalAssets = {};
+  for (const [field, baseName] of Object.entries(BRAND_ASSET_CONVENTION)) {
+    const url = resolveNamedPortalAssetUrl(root, baseName);
+    if (url) assets[field as keyof typeof BRAND_ASSET_CONVENTION] = url;
+  }
+  return Object.keys(assets).length > 0 ? assets : undefined;
 }
