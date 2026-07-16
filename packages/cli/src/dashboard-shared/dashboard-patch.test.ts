@@ -110,6 +110,51 @@ describe("preparePatchedUpstreamPluginRoot — anchor failure surfaces with PATC
     ).toThrow(new RegExp(`dashboard patch ${PATCH_ID} failed against upstream version 9\\.9\\.9`));
   });
 
+  it("symlinks workspace node_modules through the upstream realpath", () => {
+    const fakeFs = {
+      cpSync: vi.fn(),
+      existsSync: vi.fn((path: unknown) => {
+        const p = String(path);
+        return p === "/link/plugin/packages"
+          || p === "/real/plugin/packages"
+          || p === "/link/plugin/node_modules"
+          || p === "/real/plugin/node_modules"
+          || p === "/link/plugin/packages/dashboard/node_modules"
+          || p === "/real/plugin/packages/dashboard/node_modules";
+      }),
+      mkdirSync: vi.fn(),
+      readFileSync: vi.fn((path: unknown) => {
+        if (String(path).endsWith("package.json")) return JSON.stringify({ version: "1.2.3" });
+        return "no anchors here";
+      }),
+      readdirSync: vi.fn((path: unknown) => {
+        if (String(path).endsWith("/packages")) {
+          return [{ name: "dashboard", isDirectory: () => true }];
+        }
+        return [];
+      }),
+      realpathSync: vi.fn((path: unknown) => (String(path) === "/link/plugin" ? "/real/plugin" : String(path))),
+      rmSync: vi.fn(),
+      symlinkSync: vi.fn(),
+      writeFileSync: vi.fn(),
+      log: vi.fn(),
+    };
+
+    expect(() =>
+      preparePatchedUpstreamPluginRoot("/link/plugin", "/fake/state", fakeFs as never),
+    ).toThrow(/anchor not found/);
+    expect(fakeFs.symlinkSync).toHaveBeenCalledWith(
+      "/real/plugin/node_modules",
+      "/fake/state/.understand-anything/understand-anything-plugin-patched/node_modules",
+      "dir",
+    );
+    expect(fakeFs.symlinkSync).toHaveBeenCalledWith(
+      "/real/plugin/packages/dashboard/node_modules",
+      "/fake/state/.understand-anything/understand-anything-plugin-patched/packages/dashboard/node_modules",
+      "dir",
+    );
+  });
+
   it("writes patch metadata when patches succeed (smoke; injects fixture sources)", () => {
     const sources = new Map<string, string>([
       [

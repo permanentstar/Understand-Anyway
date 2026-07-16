@@ -6,9 +6,9 @@
  * confirmation for publish / set-stable / rollback / gc.
  */
 
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildGatewayReleaseDistPath,
@@ -85,22 +85,83 @@ function writeGatewayReleaseManifest(
   );
 }
 
-function copyInstalledCliPackageRelease(
+export function copyInstalledCliPackageRelease(
   packageRoot: string,
   releaseRoot: string,
 ): void {
-  const packageJsonPath = resolve(packageRoot, "package.json");
+  const resolvedPackageRoot = (() => {
+    try {
+      return realpathSync(packageRoot);
+    } catch {
+      return packageRoot;
+    }
+  })();
+  const packageJsonPath = resolve(resolvedPackageRoot, "package.json");
+  const sameRealpath = (left: string, right: string): boolean => {
+    try {
+      return realpathSync(left) === realpathSync(right);
+    } catch {
+      return false;
+    }
+  };
   if (!existsSync(packageJsonPath)) {
     throw new Error(`gateway publish rejected: installed CLI package root is missing ${packageJsonPath}`);
   }
   rmSync(releaseRoot, { recursive: true, force: true });
   mkdirSync(dirname(releaseRoot), { recursive: true });
-  const alreadyPackagedGatewayRelease = existsSync(resolve(packageRoot, "manifest.json"));
-  cpSync(packageRoot, releaseRoot, {
+  const alreadyPackagedGatewayRelease = existsSync(resolve(resolvedPackageRoot, "manifest.json"));
+  cpSync(resolvedPackageRoot, releaseRoot, {
     recursive: true,
     force: true,
     dereference: !alreadyPackagedGatewayRelease,
   });
+
+  let current = resolvedPackageRoot;
+  let installedNodeModulesRoot: string | null = null;
+  for (;;) {
+    const parent = dirname(current);
+    if (parent === current) break;
+    if (basename(parent) === ".pnpm") {
+      installedNodeModulesRoot = dirname(parent);
+      break;
+    }
+    current = parent;
+  }
+
+  if (!installedNodeModulesRoot || !existsSync(resolve(installedNodeModulesRoot, ".pnpm"))) return;
+
+  const releaseNodeModules = resolve(releaseRoot, "node_modules");
+  rmSync(releaseNodeModules, { recursive: true, force: true });
+  cpSync(installedNodeModulesRoot, releaseNodeModules, {
+    recursive: true,
+    force: true,
+    dereference: false,
+  });
+
+  const packageScopedNodeModulesRoot = dirname(dirname(resolvedPackageRoot));
+  if (!existsSync(packageScopedNodeModulesRoot)) return;
+
+  for (const entry of readdirSync(packageScopedNodeModulesRoot, { withFileTypes: true })) {
+    const name = entry.name;
+    if (name === ".bin") continue;
+    const sourcePath = resolve(packageScopedNodeModulesRoot, name);
+    const targetPath = resolve(releaseNodeModules, name);
+    if (entry.isDirectory() && name.startsWith("@")) {
+      mkdirSync(targetPath, { recursive: true });
+      for (const scopedEntry of readdirSync(sourcePath, { withFileTypes: true })) {
+        const scopedSourcePath = resolve(sourcePath, scopedEntry.name);
+        const scopedTargetPath = resolve(targetPath, scopedEntry.name);
+        if (sameRealpath(scopedSourcePath, scopedTargetPath)) continue;
+        cpSync(
+          scopedSourcePath,
+          scopedTargetPath,
+          { recursive: true, force: true, dereference: false },
+        );
+      }
+      continue;
+    }
+    cpSync(sourcePath, targetPath, { recursive: true, force: true, dereference: false });
+  }
 }
 
 function packageCurrentGatewayRelease(

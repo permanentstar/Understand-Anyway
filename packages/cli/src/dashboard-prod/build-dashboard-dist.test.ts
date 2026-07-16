@@ -101,6 +101,32 @@ describe("buildDashboardDist", () => {
     expect(result.patchId).toBe("dashboard-viewport-v2");
   });
 
+  it("installs dashboard-dist under current/ when a versioned project state exists", async () => {
+    mkdirSync(resolve(stateRoot, "current"), { recursive: true });
+
+    const { spawn } = fakeSpawn();
+    const cp = vi.fn();
+    const result = await buildDashboardDist(pluginRoot, stateRoot, makeDeps({
+      spawn: spawn as never,
+      cpSync: cp as never,
+      existsSync: ((p: unknown) => {
+        const path = String(p);
+        return path === resolve(stateRoot, "current")
+          || /package\.json|packages|homepage/.test(path);
+      }) as never,
+      readdirSync: () => [] as never,
+      patchDeps: makeFakePatchDeps(),
+    }));
+
+    const expectedDist = resolve(stateRoot, "current", "dashboard-dist");
+    expect(result.distDir).toBe(expectedDist);
+    expect(cp).toHaveBeenCalledWith(
+      expect.stringContaining("/packages/dashboard/dist"),
+      expectedDist,
+      expect.objectContaining({ recursive: true, force: true }),
+    );
+  });
+
   it("builds dashboard workspace dependencies before building the dashboard package", async () => {
     const child = new FakeChild();
     const spawn = vi.fn((_command: string, _args: string[], _options: unknown) => {

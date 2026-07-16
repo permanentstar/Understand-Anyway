@@ -101,6 +101,15 @@ describe("resolveBuildConfig", () => {
     expect(resolved.includePaths).toEqual(["src/a.ts"]);
   });
 
+  it("lets UA_BUILD_MODE_OVERRIDE force a full bootstrap over profile incremental defaults", () => {
+    const resolved = resolveBuildConfig(args({ profile: "nightly" }), {
+      profiles: { nightly: { build: { mode: "incremental" } } },
+    }, {
+      env: { UA_BUILD_MODE_OVERRIDE: "full" },
+    });
+    expect(resolved.mode).toBe("full");
+  });
+
   it("does not read occasional include targets from deploy YAML", () => {
     const resolved = resolveBuildConfig(args({ profile: "repair" }), {
       profiles: { repair: { build: { mode: "backfill" }, include: ["src/a.ts"] } },

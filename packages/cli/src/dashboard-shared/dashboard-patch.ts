@@ -17,6 +17,7 @@ import {
   cpSync as nodeCpSync,
   existsSync as nodeExistsSync,
   mkdirSync as nodeMkdirSync,
+  realpathSync as nodeRealpathSync,
   readFileSync as nodeReadFileSync,
   readdirSync as nodeReaddirSync,
   rmSync as nodeRmSync,
@@ -39,6 +40,7 @@ export interface DashboardPatchDeps {
   cpSync?: typeof nodeCpSync;
   existsSync?: typeof nodeExistsSync;
   mkdirSync?: typeof nodeMkdirSync;
+  realpathSync?: typeof nodeRealpathSync;
   readFileSync?: typeof nodeReadFileSync;
   readdirSync?: typeof nodeReaddirSync;
   rmSync?: typeof nodeRmSync;
@@ -73,6 +75,14 @@ function readUpstreamVersion(pluginRoot: string, read: typeof nodeReadFileSync):
   const packageJsonPath = resolve(pluginRoot, ROOT_PACKAGE_JSON);
   const packageJson = readJsonFile<{ version?: string }>(packageJsonPath, read);
   return String(packageJson.version || "").trim();
+}
+
+function canonicalPluginRoot(pluginRoot: string, realpath: typeof nodeRealpathSync): string {
+  try {
+    return realpath(pluginRoot);
+  } catch {
+    return pluginRoot;
+  }
 }
 
 export function patchGraphViewSource(source: string): string {
@@ -352,6 +362,7 @@ export function preparePatchedUpstreamPluginRoot(
   const cp = deps.cpSync ?? nodeCpSync;
   const exists = deps.existsSync ?? nodeExistsSync;
   const mkdir = deps.mkdirSync ?? nodeMkdirSync;
+  const realpath = deps.realpathSync ?? nodeRealpathSync;
   const read = deps.readFileSync ?? nodeReadFileSync;
   const readdir = deps.readdirSync ?? nodeReaddirSync;
   const rm = deps.rmSync ?? nodeRmSync;
@@ -360,13 +371,14 @@ export function preparePatchedUpstreamPluginRoot(
   const now = deps.now ?? (() => new Date());
   const log = deps.log ?? (() => {});
 
-  const upstreamVersion = readUpstreamVersion(pluginRoot, read);
+  const resolvedPluginRoot = canonicalPluginRoot(pluginRoot, realpath);
+  const upstreamVersion = readUpstreamVersion(resolvedPluginRoot, read);
   const uaDir = resolve(stateRoot, ".understand-anything");
   const patchedRoot = resolve(uaDir, PATCH_WORKSPACE_DIRNAME);
   mkdir(uaDir, { recursive: true });
 
-  copyPluginWorkspaceWithoutNodeModules(pluginRoot, patchedRoot, cp, rm, mkdir);
-  linkWorkspaceNodeModules(pluginRoot, patchedRoot, exists, readdir, rm, mkdir, symlink);
+  copyPluginWorkspaceWithoutNodeModules(resolvedPluginRoot, patchedRoot, cp, rm, mkdir);
+  linkWorkspaceNodeModules(resolvedPluginRoot, patchedRoot, exists, readdir, rm, mkdir, symlink);
   const { patchedFiles } = applyDashboardPatches(patchedRoot, upstreamVersion, read, write);
 
   const metadataPath = resolve(uaDir, PATCH_METADATA_FILENAME);
@@ -376,7 +388,7 @@ export function preparePatchedUpstreamPluginRoot(
       {
         patchId: PATCH_ID,
         upstreamVersion,
-        upstreamPluginRoot: pluginRoot,
+        upstreamPluginRoot: resolvedPluginRoot,
         patchedPluginRoot: patchedRoot,
         patchedFiles,
         generatedAt: now().toISOString(),

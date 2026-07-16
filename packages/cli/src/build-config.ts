@@ -60,6 +60,13 @@ function modeValue(value: unknown): BuildMode | undefined {
   throw new ArgsError(`invalid build.mode: ${String(value)}`);
 }
 
+function modeFromEnv(env: NodeJS.ProcessEnv, key: string): BuildMode | undefined {
+  const raw = env[key];
+  if (raw === undefined || raw === "") return undefined;
+  if (raw === "full" || raw === "incremental" || raw === "resume" || raw === "backfill") return raw;
+  throw new ArgsError(`invalid ${key}: ${raw}`);
+}
+
 function buildSection(value: unknown): BuildSection {
   return value && typeof value === "object" ? (value as BuildSection) : {};
 }
@@ -185,6 +192,7 @@ export function resolveBuildConfig(
   const profileBuild = buildSection(profile?.["build"]);
   const configuredMode = modeValue(profileBuild?.mode ?? baseBuild?.mode);
   const env = deps.env ?? process.env;
+  const envModeOverride = modeFromEnv(env, "UA_BUILD_MODE_OVERRIDE");
 
   const cliBatchMode = args.batchMode !== "auto" ? args.batchMode : undefined;
   const batchMode: BatchMode =
@@ -213,7 +221,7 @@ export function resolveBuildConfig(
     ?? defaultMapperConcurrencyForHost(metrics);
 
   return {
-    mode: args.mode !== "full" ? args.mode : configuredMode ?? "full",
+    mode: args.mode !== "full" ? args.mode : envModeOverride ?? configuredMode ?? "full",
     includePaths: args.includePaths,
     excludeTests: args.excludeTests ?? profileBuild?.excludeTests ?? baseBuild?.excludeTests ?? true,
     pluginRoot: args.pluginRoot ?? profileBuild?.pluginRoot ?? baseBuild?.pluginRoot ?? null,

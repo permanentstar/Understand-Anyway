@@ -60,6 +60,12 @@ export interface BuildDashboardDistResult {
 
 const DASHBOARD_DIST_DIRNAME = "dashboard-dist";
 
+function resolveDashboardDistInstallDir(stateRoot: string, exists: typeof nodeExistsSync): string {
+  const versionedCurrent = resolve(stateRoot, "current");
+  if (exists(versionedCurrent)) return resolve(versionedCurrent, DASHBOARD_DIST_DIRNAME);
+  return resolve(stateRoot, DASHBOARD_DIST_DIRNAME);
+}
+
 function distExistsAndPopulated(distDir: string, exists: typeof nodeExistsSync, readdir: typeof nodeReaddirSync): boolean {
   if (!exists(distDir)) return false;
   try {
@@ -105,7 +111,7 @@ export async function buildDashboardDist(
   const pnpmBin = deps.pnpmBin ?? "pnpm";
   const log = deps.log ?? (() => {});
 
-  const distDir = resolve(stateRoot, DASHBOARD_DIST_DIRNAME);
+  const distDir = resolveDashboardDistInstallDir(stateRoot, exists);
 
   if (!deps.force && distExistsAndPopulated(distDir, exists, readdir)) {
     log(`dashboard-dist exists at ${distDir}; skipping build (pass --rebuild-dashboard to force)`);

@@ -1,4 +1,4 @@
-import { lstatSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
@@ -11,7 +11,7 @@ import {
   readGatewayState,
   writeGatewayState,
 } from "@understand-anyway/gateway";
-import { runGateway } from "./index.js";
+import { copyInstalledCliPackageRelease, runGateway } from "./index.js";
 
 function repoRoot(): string {
   return process.cwd().endsWith("/packages/cli") ? resolve(process.cwd(), "..", "..") : process.cwd();
@@ -76,6 +76,51 @@ describe("runGateway publish", () => {
       const nestedCliPath = resolve(nextLink!, "dist", "cli.js");
       const nestedHelp = spawnSync(process.execPath, [nestedCliPath, "--help"], { encoding: "utf8" });
       expect(nestedHelp.status).toBe(0);
+  });
+
+  it("copies the enclosing pnpm node_modules tree for installed-cli releases", () => {
+    const work = mkdtempSync(resolve(tmpdir(), "ua-gateway-installed-copy-"));
+    try {
+      const installRoot = resolve(work, "install");
+      const packageRoot = resolve(
+        installRoot,
+        "node_modules/.pnpm/@understand-anyway+cli@0.0.2/node_modules/@understand-anyway/cli",
+      );
+      const coreStoreRoot = resolve(
+        installRoot,
+        "node_modules/.pnpm/@understand-anyway+core@0.0.2/node_modules/@understand-anyway/core",
+      );
+      mkdirSync(resolve(packageRoot, "dist"), { recursive: true });
+      mkdirSync(resolve(packageRoot, "node_modules/.bin"), { recursive: true });
+      writeFileSync(resolve(packageRoot, "package.json"), JSON.stringify({ name: "@understand-anyway/cli" }), "utf8");
+      writeFileSync(resolve(packageRoot, "dist/cli.js"), 'import "@understand-anyway/core";\n', "utf8");
+
+      mkdirSync(resolve(coreStoreRoot, "dist"), { recursive: true });
+      writeFileSync(resolve(coreStoreRoot, "package.json"), JSON.stringify({ name: "@understand-anyway/core" }), "utf8");
+      writeFileSync(resolve(coreStoreRoot, "dist/index.js"), "export {};\n", "utf8");
+
+      mkdirSync(resolve(installRoot, "node_modules/@understand-anyway"), { recursive: true });
+      symlinkSync(
+        "../.pnpm/@understand-anyway+cli@0.0.2/node_modules/@understand-anyway/cli",
+        resolve(installRoot, "node_modules/@understand-anyway/cli"),
+        "dir",
+      );
+      symlinkSync(
+        "../.pnpm/@understand-anyway+core@0.0.2/node_modules/@understand-anyway/core",
+        resolve(installRoot, "node_modules/@understand-anyway/core"),
+        "dir",
+      );
+      writeFileSync(resolve(installRoot, "node_modules/.pnpm/lock.yaml"), "", "utf8");
+
+      const releaseRoot = resolve(work, "release");
+      copyInstalledCliPackageRelease(packageRoot, releaseRoot);
+
+      expect(existsSync(resolve(releaseRoot, "dist/cli.js"))).toBe(true);
+      expect(existsSync(resolve(releaseRoot, "node_modules/.pnpm/lock.yaml"))).toBe(true);
+      expect(existsSync(resolve(releaseRoot, "node_modules/@understand-anyway/core/package.json"))).toBe(true);
+    } finally {
+      rmSync(work, { recursive: true, force: true });
+    }
   });
 });
 
