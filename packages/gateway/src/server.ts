@@ -151,7 +151,7 @@ export function createGatewayServer(options: GatewayServerOptions): Server {
           targetUrl: url.pathname,
           extra: { reason: orgDecision.reason ?? "" },
         });
-        sendHtml(res, 403, renderDeniedPage(orgDecision.reason));
+        sendHtml(res, 403, orgDecision.html ?? renderDeniedPage(orgDecision.reason));
         return;
       }
       trackEvent(session, req, {

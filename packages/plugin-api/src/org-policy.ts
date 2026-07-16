@@ -11,6 +11,8 @@ import type { AuthedUser } from "./auth.js";
 export interface OrgPolicyDecision {
   allowed: boolean;
   reason?: string;
+  /** Optional provider-supplied denial HTML; gateway renders neutral 403 when absent. */
+  html?: string;
 }
 
 export interface OrgPolicyProvider {
