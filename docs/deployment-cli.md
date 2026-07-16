@@ -8,6 +8,8 @@
 
 > 发版前统一门禁入口为 `pnpm run release:gate`。完整测试矩阵收口在 [release-tests/README.md](./release-tests/README.md)；具体部署形态约束见 [release-tests/local/repo-checkout/expected-layout.md](./release-tests/local/repo-checkout/expected-layout.md)。
 
+> **两种运行形态**：源码 checkout 形态直接跑 `scripts/*.sh`；标准 OSS 安装形态（仅 `npm install @understand-anyway/cli`、无源码树）则通过 `understand-anyway ops <name>` 调用包内 `dist-scripts/` 里的同名编排脚本。详见 [§1.11](#111-标准-oss-安装形态无源码树)。
+
 ---
 
 ## 0. 配置先行：deploy.yaml 模板
@@ -185,6 +187,25 @@ understand-anyway project-state gc --project mini-project --retain 3
 understand-anyway repair llm-failures       --project <id>
 understand-anyway repair llm-graph-failures --project <id>
 ```
+
+### 1.11 标准 OSS 安装形态（无源码树）
+
+只从 registry 安装 CLI、不 clone 源码时，用 `understand-anyway ops <name>` 调用包内
+`dist-scripts/` 里的编排脚本，等价于源码形态下的 `scripts/<name>.sh`：
+
+```bash
+npm install @understand-anyway/cli          # 或 pnpm add / yarn add
+understand-anyway ops daily-update          --project <id> --profile small --deploy-profile ppe
+understand-anyway ops nightly-project-sync  --project <id> --profile small
+understand-anyway ops refresh-prod-server   --profile small
+```
+
+- 可用脚本：`daily-update`、`nightly-project-sync`、`refresh-prod-server`。参数与
+  对应 `scripts/<name>.sh` 完全一致（见 [§2 脚本参数表](#2-脚本参数表)），`ops`
+  之后的所有参数原样透传。
+- 包内脚本以 `bash <script>` 方式互相调用，不依赖文件 exec 位（npm 安装会丢 exec 位）。
+- gateway runtime release 在 npm 扁平 `node_modules` 布局下会连同依赖一起复制，
+  无需源码 workspace。
 
 ---
 

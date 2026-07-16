@@ -27,6 +27,7 @@ __ua_ppe_env_repo_root="$(cd -- "$__ua_ppe_env_script_dir/.." && pwd -P)"
 : "${UA_RELEASE_GATE_PPE_ROOT:=/data00/home/suheng.cloud/understand-anyway-ppe}"
 : "${UA_RELEASE_GATE_PPE_PLUGIN_ROOT:=/data00/home/suheng.cloud/.local/share/understand-anything-plugin/understand-anything-plugin}"
 : "${UA_RELEASE_GATE_PPE_TRAEX_BIN:=/home/${UA_RELEASE_GATE_PPE_USER}/.local/bin/traex}"
+: "${UA_RELEASE_GATE_PPE_REGISTRY:=http://127.0.0.1:4873}"
 
 __ua_ppe_env_find_repo_base() {
   local root="$1"
@@ -74,16 +75,19 @@ export UA_RELEASE_GATE_PPE_REPO_DIR
 export UA_RELEASE_GATE_PPE_REPO_PROJECTS_ROOT
 export UA_RELEASE_GATE_PPE_NPM_DIR
 export UA_RELEASE_GATE_PPE_TRAEX_BIN
+export UA_RELEASE_GATE_PPE_REGISTRY
 
 : "${UA_RELEASE_GATE_EXTERNAL_PPE_REPO_CMD:=node '$__ua_ppe_env_repo_root/scripts/release-gate-ppe.mjs' --case ppe-repo}"
 : "${UA_RELEASE_GATE_EXTERNAL_PPE_NPM_INSTALLED_CMD:=node '$__ua_ppe_env_repo_root/scripts/release-gate-ppe.mjs' --case ppe-npm-installed}"
 : "${UA_RELEASE_GATE_EXTERNAL_PPE_OPS_CMD:=node '$__ua_ppe_env_repo_root/scripts/release-gate-ppe.mjs' --case ppe-ops}"
 : "${UA_RELEASE_GATE_EXTERNAL_PPE_REAL_LLM_CMD:=node '$__ua_ppe_env_repo_root/scripts/release-gate-ppe.mjs' --case ppe-real-llm}"
+: "${UA_RELEASE_GATE_EXTERNAL_PPE_OSS_RELEASE_CMD:=node '$__ua_ppe_env_repo_root/scripts/release-gate-ppe.mjs' --case ppe-oss-release}"
 
 export UA_RELEASE_GATE_EXTERNAL_PPE_REPO_CMD
 export UA_RELEASE_GATE_EXTERNAL_PPE_NPM_INSTALLED_CMD
 export UA_RELEASE_GATE_EXTERNAL_PPE_OPS_CMD
 export UA_RELEASE_GATE_EXTERNAL_PPE_REAL_LLM_CMD
+export UA_RELEASE_GATE_EXTERNAL_PPE_OSS_RELEASE_CMD
 
 unset __ua_ppe_env_script_dir
 unset __ua_ppe_env_repo_root

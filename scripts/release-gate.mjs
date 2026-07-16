@@ -9,6 +9,7 @@ export const EXTERNAL_CASE_ENV_VARS = {
   "ppe-npm-installed": "UA_RELEASE_GATE_EXTERNAL_PPE_NPM_INSTALLED_CMD",
   "ppe-ops": "UA_RELEASE_GATE_EXTERNAL_PPE_OPS_CMD",
   "ppe-real-llm": "UA_RELEASE_GATE_EXTERNAL_PPE_REAL_LLM_CMD",
+  "ppe-oss-release": "UA_RELEASE_GATE_EXTERNAL_PPE_OSS_RELEASE_CMD",
 };
 
 export const LOCAL_REQUIRED_CHECKS = [

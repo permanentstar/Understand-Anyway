@@ -30,10 +30,12 @@ const keys = [
   "UA_RELEASE_GATE_PPE_REPO_PROJECTS_ROOT",
   "UA_RELEASE_GATE_PPE_NPM_DIR",
   "UA_RELEASE_GATE_PPE_TRAEX_BIN",
+  "UA_RELEASE_GATE_PPE_REGISTRY",
   "UA_RELEASE_GATE_EXTERNAL_PPE_REPO_CMD",
   "UA_RELEASE_GATE_EXTERNAL_PPE_NPM_INSTALLED_CMD",
   "UA_RELEASE_GATE_EXTERNAL_PPE_OPS_CMD",
   "UA_RELEASE_GATE_EXTERNAL_PPE_REAL_LLM_CMD",
+  "UA_RELEASE_GATE_EXTERNAL_PPE_OSS_RELEASE_CMD",
 ];
 const out = {};
 for (const key of keys) out[key] = process.env[key] ?? null;
@@ -80,10 +82,12 @@ try {
   assert.equal(env.UA_RELEASE_GATE_PPE_REPO_PROJECTS_ROOT, resolve(repoBase, "projects-root"));
   assert.equal(env.UA_RELEASE_GATE_PPE_NPM_DIR, npmB);
   assert.match(env.UA_RELEASE_GATE_PPE_TRAEX_BIN, /\/home\/suheng\.cloud\/\.local\/bin\/traex$/);
+  assert.equal(env.UA_RELEASE_GATE_PPE_REGISTRY, "http://127.0.0.1:4873");
   assert.match(env.UA_RELEASE_GATE_EXTERNAL_PPE_REPO_CMD, /release-gate-ppe\.mjs' --case ppe-repo$/);
   assert.match(env.UA_RELEASE_GATE_EXTERNAL_PPE_NPM_INSTALLED_CMD, /release-gate-ppe\.mjs' --case ppe-npm-installed$/);
   assert.match(env.UA_RELEASE_GATE_EXTERNAL_PPE_OPS_CMD, /release-gate-ppe\.mjs' --case ppe-ops$/);
   assert.match(env.UA_RELEASE_GATE_EXTERNAL_PPE_REAL_LLM_CMD, /release-gate-ppe\.mjs' --case ppe-real-llm$/);
+  assert.match(env.UA_RELEASE_GATE_EXTERNAL_PPE_OSS_RELEASE_CMD, /release-gate-ppe\.mjs' --case ppe-oss-release$/);
 
   const overridden = sourceEnv({
     UA_RELEASE_GATE_PPE_HOST: "1.2.3.4",
