@@ -1,0 +1,603 @@
+scripts/__tests__/release-gate-ppe-verdaccio.test.mjs
+  s_a59a8dcee95c4d::t_61b693992c3bb6 48-49 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a589218f0c35c8e34e462ee","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Range":[48,49]}]}]}
+  s_a59a8dcee95c4d::t_0c52085c174104 50 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a589252f0c35c8e34e4633f","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Single":50}]}]}
+scripts/regression-daily-update.mjs
+  s_a59a8dcee95c4d::t_2e89f25d29601a 102 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a58965ff0c35c8e34e464bd","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Single":102}]}]}
+scripts/release-gate-ppe.mjs
+  s_a59a8dcee95c4d::t_64de8dac2b918d 3,83-95,101,119,270,351,381,472,484,488-490,492-493 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a5891e6f0c35c8e34e462a9","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Single":3},{"Range":[83,95]},{"Single":101},{"Single":119},{"Single":270},{"Single":351},{"Single":381},{"Single":472},{"Single":484},{"Range":[488,490]},{"Range":[492,493]}]}]}
+  s_a59a8dcee95c4d::t_d57b03186b55c3 300,361-362,367,393 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a589931f0c35c8e34e46714","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Single":300},{"Range":[361,362]},{"Single":367},{"Single":393}]}]}
+scripts/__tests__/release-gate-ppe.test.mjs
+  s_a59a8dcee95c4d::t_f02378aba68a36 83-85,87-88 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a589912f0c35c8e34e466f0","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Range":[83,85]},{"Range":[87,88]}]}]}
+  s_a59a8dcee95c4d::t_eeccbbe360d5b3 86 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a589948f0c35c8e34e46738","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Single":86}]}]}
+  s_a59a8dcee95c4d::t_5d803ae59f57b5 79,81-82 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a589106f0c35c8e34e46270","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Single":79},{"Range":[81,82]}]}]}
+scripts/release-gate-ppe-verdaccio.mjs
+  s_a59a8dcee95c4d::t_57734ad9db0c86 16,83-91,96,101,104-105,140,148,156,163,192,211-213,229,238 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a5891fcf0c35c8e34e462ca","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Single":16},{"Range":[83,91]},{"Single":96},{"Single":101},{"Range":[104,105]},{"Single":140},{"Single":148},{"Single":156},{"Single":163},{"Single":192},{"Range":[211,213]},{"Single":229},{"Single":238}]}]}
+  s_a59a8dcee95c4d::t_a793c25f5332aa 230 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a589223f0c35c8e34e46315","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Single":230}]}]}
+scripts/__tests__/daily-update.test.mjs
+  s_a59a8dcee95c4d::t_ef67cf0de275d6 5,134-145,153-156,158 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a589779f0c35c8e34e465b2","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Single":5},{"Range":[134,145]},{"Range":[153,156]},{"Single":158}]}]}
+  s_a59a8dcee95c4d::t_d319e2747f1d06 147-152,157 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a58971df0c35c8e34e46513","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Range":[147,152]},{"Single":157}]}]}
+scripts/daily-update.sh
+  s_a59a8dcee95c4d::t_063d3c07c88ba1 131-135 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a589640f0c35c8e34e4649d","tool_type":"agent","tool_id":"apply_patch","line_ranges":[{"Range":[131,135]}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "536649d85eb2d2f6c39dd9060f7577212fdb3353",
+  "prompts": {},
+  "sessions": {
+    "s_a59a8dcee95c4d": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a565addf72d6ccd416e1502",
+        "model": "gpt-5.4__dev"
+      },
+      "human_author": "permanentstar <permanent.star@gmail.com>"
+    }
+  },
+  "attestation_metadata": {
+    "scripts/__tests__/daily-update.test.mjs": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_ef67cf0de275d6",
+        "line_ranges": [
+          {
+            "Single": 5
+          },
+          {
+            "Range": [
+              134,
+              145
+            ]
+          },
+          {
+            "Range": [
+              153,
+              156
+            ]
+          },
+          {
+            "Single": 158
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a589779f0c35c8e34e465b2",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Single": 5
+              },
+              {
+                "Range": [
+                  134,
+                  145
+                ]
+              },
+              {
+                "Range": [
+                  153,
+                  156
+                ]
+              },
+              {
+                "Single": 158
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_a59a8dcee95c4d::t_d319e2747f1d06",
+        "line_ranges": [
+          {
+            "Range": [
+              147,
+              152
+            ]
+          },
+          {
+            "Single": 157
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a58971df0c35c8e34e46513",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Range": [
+                  147,
+                  152
+                ]
+              },
+              {
+                "Single": 157
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "scripts/__tests__/release-gate-ppe-verdaccio.test.mjs": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_61b693992c3bb6",
+        "line_ranges": [
+          {
+            "Range": [
+              48,
+              49
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a589218f0c35c8e34e462ee",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Range": [
+                  48,
+                  49
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_a59a8dcee95c4d::t_0c52085c174104",
+        "line_ranges": [
+          {
+            "Single": 50
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a589252f0c35c8e34e4633f",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Single": 50
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "scripts/__tests__/release-gate-ppe.test.mjs": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_f02378aba68a36",
+        "line_ranges": [
+          {
+            "Range": [
+              83,
+              85
+            ]
+          },
+          {
+            "Range": [
+              87,
+              88
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a589912f0c35c8e34e466f0",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Range": [
+                  83,
+                  85
+                ]
+              },
+              {
+                "Range": [
+                  87,
+                  88
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_a59a8dcee95c4d::t_eeccbbe360d5b3",
+        "line_ranges": [
+          {
+            "Single": 86
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a589948f0c35c8e34e46738",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Single": 86
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_a59a8dcee95c4d::t_5d803ae59f57b5",
+        "line_ranges": [
+          {
+            "Single": 79
+          },
+          {
+            "Range": [
+              81,
+              82
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a589106f0c35c8e34e46270",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Single": 79
+              },
+              {
+                "Range": [
+                  81,
+                  82
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "scripts/daily-update.sh": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_063d3c07c88ba1",
+        "line_ranges": [
+          {
+            "Range": [
+              131,
+              135
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a589640f0c35c8e34e4649d",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Range": [
+                  131,
+                  135
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "scripts/regression-daily-update.mjs": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_2e89f25d29601a",
+        "line_ranges": [
+          {
+            "Single": 102
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a58965ff0c35c8e34e464bd",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Single": 102
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "scripts/release-gate-ppe-verdaccio.mjs": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_57734ad9db0c86",
+        "line_ranges": [
+          {
+            "Single": 16
+          },
+          {
+            "Range": [
+              83,
+              91
+            ]
+          },
+          {
+            "Single": 96
+          },
+          {
+            "Single": 101
+          },
+          {
+            "Range": [
+              104,
+              105
+            ]
+          },
+          {
+            "Single": 140
+          },
+          {
+            "Single": 148
+          },
+          {
+            "Single": 156
+          },
+          {
+            "Single": 163
+          },
+          {
+            "Single": 192
+          },
+          {
+            "Range": [
+              211,
+              213
+            ]
+          },
+          {
+            "Single": 229
+          },
+          {
+            "Single": 238
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a5891fcf0c35c8e34e462ca",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Single": 16
+              },
+              {
+                "Range": [
+                  83,
+                  91
+                ]
+              },
+              {
+                "Single": 96
+              },
+              {
+                "Single": 101
+              },
+              {
+                "Range": [
+                  104,
+                  105
+                ]
+              },
+              {
+                "Single": 140
+              },
+              {
+                "Single": 148
+              },
+              {
+                "Single": 156
+              },
+              {
+                "Single": 163
+              },
+              {
+                "Single": 192
+              },
+              {
+                "Range": [
+                  211,
+                  213
+                ]
+              },
+              {
+                "Single": 229
+              },
+              {
+                "Single": 238
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_a59a8dcee95c4d::t_a793c25f5332aa",
+        "line_ranges": [
+          {
+            "Single": 230
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a589223f0c35c8e34e46315",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Single": 230
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "scripts/release-gate-ppe.mjs": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_64de8dac2b918d",
+        "line_ranges": [
+          {
+            "Single": 3
+          },
+          {
+            "Range": [
+              83,
+              95
+            ]
+          },
+          {
+            "Single": 101
+          },
+          {
+            "Single": 119
+          },
+          {
+            "Single": 270
+          },
+          {
+            "Single": 351
+          },
+          {
+            "Single": 381
+          },
+          {
+            "Single": 472
+          },
+          {
+            "Single": 484
+          },
+          {
+            "Range": [
+              488,
+              490
+            ]
+          },
+          {
+            "Range": [
+              492,
+              493
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a5891e6f0c35c8e34e462a9",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Single": 3
+              },
+              {
+                "Range": [
+                  83,
+                  95
+                ]
+              },
+              {
+                "Single": 101
+              },
+              {
+                "Single": 119
+              },
+              {
+                "Single": 270
+              },
+              {
+                "Single": 351
+              },
+              {
+                "Single": 381
+              },
+              {
+                "Single": 472
+              },
+              {
+                "Single": 484
+              },
+              {
+                "Range": [
+                  488,
+                  490
+                ]
+              },
+              {
+                "Range": [
+                  492,
+                  493
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "hash": "s_a59a8dcee95c4d::t_d57b03186b55c3",
+        "line_ranges": [
+          {
+            "Single": 300
+          },
+          {
+            "Range": [
+              361,
+              362
+            ]
+          },
+          {
+            "Single": 367
+          },
+          {
+            "Single": 393
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a589931f0c35c8e34e46714",
+            "tool_type": "agent",
+            "tool_id": "apply_patch",
+            "line_ranges": [
+              {
+                "Single": 300
+              },
+              {
+                "Range": [
+                  361,
+                  362
+                ]
+              },
+              {
+                "Single": 367
+              },
+              {
+                "Single": 393
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {}
+}
