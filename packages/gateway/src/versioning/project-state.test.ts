@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -66,6 +66,27 @@ describe("project versioned state", () => {
     const versionDist = buildProjectVersionDashboardDistPath("v1", stateRoot);
     expect(readFileSync(resolve(versionDist, "index.html"), "utf8")).toContain("doctype html");
     expect(readFileSync(resolve(versionDist, "assets", "app.js"), "utf8")).toContain("console.log");
+  });
+
+  it("hoists an empty flat dashboard-dist into versions/<vid>/dashboard-dist on publish", () => {
+    // Empty staging dir still gets promoted so the version snapshot has a well-known
+    // (though empty) dashboard-dist container. Portal 404s here are a separate concern.
+    mkdirSync(resolve(stateRoot, "dashboard-dist"), { recursive: true });
+
+    seedProjectVersion("v1", stateRoot);
+
+    const versionDist = buildProjectVersionDashboardDistPath("v1", stateRoot);
+    expect(existsSync(versionDist)).toBe(true);
+    expect(readdirSync(versionDist)).toEqual([]);
+  });
+
+  it("publish succeeds and omits dashboard-dist when no flat staging exists (legacy layout)", () => {
+    // Backward-compat: pre-Method-A state roots that never ran dashboard build-dist
+    // must still publish cleanly. No dashboard-dist entry in the version snapshot.
+    seedProjectVersion("v1", stateRoot);
+
+    const versionDist = buildProjectVersionDashboardDistPath("v1", stateRoot);
+    expect(existsSync(versionDist)).toBe(false);
   });
 
   it("setStableProjectVersion points stable at an existing ready version", () => {

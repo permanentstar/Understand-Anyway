@@ -32,6 +32,7 @@ function setupFakeBin(workDir, gateOpts = {}) {
   const logPath = resolve(workDir, "shim.log");
   const approved = gateOpts.approved === false ? "false" : "true";
   const failed = gateOpts.failed === true ? "true" : "false";
+  const buildDistFailed = gateOpts.buildDistFailed === true ? "true" : "false";
   const shim = `#!/usr/bin/env bash
 { printf '%s\\n' "$*"; } >> "${logPath}"
 graph_path_for_project() {
@@ -69,6 +70,15 @@ if [[ "$1" == "build" ]]; then
     mkdir -p "$(dirname "$graph_path")"
     printf '%s' '{"nodes":[],"edges":[]}' > "$graph_path"
   fi
+  exit 0
+fi
+if [[ "$1" == "dashboard" && "$2" == "build-dist" ]]; then
+  if [[ "${buildDistFailed}" == "true" ]]; then
+    exit 3
+  fi
+  exit 0
+fi
+if [[ "$1" == "project-state" && "$2" == "publish" ]]; then
   exit 0
 fi
 if [[ "$1" == "review-graph-health" ]]; then
@@ -352,7 +362,7 @@ function runScript(args, env) {
     const secondLines = allLines.length;
     check(
       "commit-changed: build re-invoked",
-      secondLines === firstLines + 3,
+      secondLines === firstLines + 4,
       `before=${firstLines} after=${secondLines}`,
     );
     const buildLines = allLines.filter((line) => line.startsWith("build "));
@@ -368,6 +378,146 @@ function runScript(args, env) {
 
 // --- Test 4 removed: --review-cmd is gone. External review hooks must
 // integrate via `understand-anyway review-graph-health` adapters.
+
+// --- Test 3b: dashboard build-dist runs between build and project-state publish ---
+{
+  const work = makeTmp();
+  try {
+    const projectsRoot = resolve(work, "projects");
+    const { binDir, logPath } = setupFakeBin(work);
+    const { stateDir } = setupOneProject(projectsRoot);
+
+    const env = {
+      ...process.env,
+      PATH: `${binDir}:${process.env.PATH}`,
+      UA_PROJECTS_ROOT: projectsRoot,
+      HOME: work,
+      UA_PLUGIN_ROOT: "/tmp/fake-plugin-root",
+    };
+    const result = runScript(["--no-pull"], env);
+    check("build-dist-seq: exit 0", result.status === 0, `${result.status}\n${result.stderr}`);
+    const lines = readFileSync(logPath, "utf8").split("\n").filter(Boolean);
+    const buildIdx = lines.findIndex((line) => line.startsWith("build "));
+    const buildDistIdx = lines.findIndex((line) => line.startsWith("dashboard build-dist"));
+    const publishIdx = lines.findIndex((line) => line.startsWith("project-state publish"));
+    check("build-dist-seq: build invoked", buildIdx !== -1, lines.join("\n"));
+    check("build-dist-seq: dashboard build-dist invoked", buildDistIdx !== -1, lines.join("\n"));
+    check("build-dist-seq: project-state publish invoked", publishIdx !== -1, lines.join("\n"));
+    check(
+      "build-dist-seq: build → dashboard build-dist → project-state publish order",
+      buildIdx < buildDistIdx && buildDistIdx < publishIdx,
+      `build=${buildIdx} build-dist=${buildDistIdx} publish=${publishIdx}\n${lines.join("\n")}`,
+    );
+    const buildDistLine = lines[buildDistIdx] ?? "";
+    check(
+      "build-dist-seq: build-dist forwards --project and --rebuild-dashboard",
+      buildDistLine.includes("--project alpha") && buildDistLine.includes("--rebuild-dashboard"),
+      buildDistLine,
+    );
+    check(
+      "build-dist-seq: build-dist forwards --plugin-root",
+      buildDistLine.includes("--plugin-root /tmp/fake-plugin-root"),
+      buildDistLine,
+    );
+    const nightlyLatest = resolve(stateDir, ".understand-anything", "nightly-latest.json");
+    const payload = JSON.parse(readFileSync(nightlyLatest, "utf8"));
+    check(
+      "build-dist-seq: result.json has dashboardBuildDist.status=success",
+      payload.dashboardBuildDist?.status === "success",
+      JSON.stringify(payload.dashboardBuildDist),
+    );
+    check(
+      "build-dist-seq: result.json has dashboardBuildDist.logPath",
+      typeof payload.dashboardBuildDist?.logPath === "string" && payload.dashboardBuildDist.logPath.endsWith("dashboard-build-dist.log"),
+      JSON.stringify(payload.dashboardBuildDist),
+    );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+// --- Test 3c: dashboard build-dist failure does NOT fail overallStatus ---
+{
+  const work = makeTmp();
+  try {
+    const projectsRoot = resolve(work, "projects");
+    const { binDir, logPath } = setupFakeBin(work, { buildDistFailed: true });
+    const { stateDir } = setupOneProject(projectsRoot);
+
+    const env = {
+      ...process.env,
+      PATH: `${binDir}:${process.env.PATH}`,
+      UA_PROJECTS_ROOT: projectsRoot,
+      HOME: work,
+      UA_PLUGIN_ROOT: "/tmp/fake-plugin-root",
+    };
+    const result = runScript(["--no-pull"], env);
+    check("build-dist-fail: exit 0 despite build-dist failure", result.status === 0, `${result.status}\n${result.stderr}`);
+    const lines = readFileSync(logPath, "utf8").split("\n").filter(Boolean);
+    // publish still ran even though build-dist failed
+    const publishIdx = lines.findIndex((line) => line.startsWith("project-state publish"));
+    check("build-dist-fail: project-state publish still ran", publishIdx !== -1, lines.join("\n"));
+    const nightlyLatest = resolve(stateDir, ".understand-anything", "nightly-latest.json");
+    const payload = JSON.parse(readFileSync(nightlyLatest, "utf8"));
+    check(
+      "build-dist-fail: overallStatus=success (build-dist warning, not gate)",
+      payload.overallStatus === "success",
+      JSON.stringify(payload),
+    );
+    check(
+      "build-dist-fail: dashboardBuildDist.status=failed",
+      payload.dashboardBuildDist?.status === "failed",
+      JSON.stringify(payload.dashboardBuildDist),
+    );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+// --- Test 3d: dashboard build-dist runs without --plugin-root when UA_PLUGIN_ROOT is unset ---
+// The CLI auto-resolves upstream plugin (matching `build`); nightly should not
+// gate on UA_PLUGIN_ROOT presence.
+{
+  const work = makeTmp();
+  try {
+    const projectsRoot = resolve(work, "projects");
+    const { binDir, logPath } = setupFakeBin(work);
+    const { stateDir } = setupOneProject(projectsRoot);
+
+    const env = {
+      ...process.env,
+      PATH: `${binDir}:${process.env.PATH}`,
+      UA_PROJECTS_ROOT: projectsRoot,
+      HOME: work,
+    };
+    delete env.UA_PLUGIN_ROOT;
+    const result = runScript(["--no-pull"], env);
+    check("build-dist-no-plugin: exit 0", result.status === 0, `${result.status}\n${result.stderr}`);
+    const lines = readFileSync(logPath, "utf8").split("\n").filter(Boolean);
+    const buildDistIdx = lines.findIndex((line) => line.startsWith("dashboard build-dist"));
+    check("build-dist-no-plugin: dashboard build-dist invoked", buildDistIdx !== -1, lines.join("\n"));
+    const buildDistLine = lines[buildDistIdx] ?? "";
+    check(
+      "build-dist-no-plugin: build-dist without --plugin-root when UA_PLUGIN_ROOT unset",
+      !buildDistLine.includes("--plugin-root"),
+      buildDistLine,
+    );
+    const nightlyLatest = resolve(stateDir, ".understand-anything", "nightly-latest.json");
+    const payload = JSON.parse(readFileSync(nightlyLatest, "utf8"));
+    check(
+      "build-dist-no-plugin: dashboardBuildDist.status=success",
+      payload.dashboardBuildDist?.status === "success",
+      JSON.stringify(payload.dashboardBuildDist),
+    );
+    check(
+      "build-dist-no-plugin: overallStatus=success",
+      payload.overallStatus === "success",
+      JSON.stringify(payload),
+    );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
 
 // --- Test 5: aggregate result.json written under projectsRoot/gateway/operations ---
 {

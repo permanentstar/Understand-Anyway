@@ -282,6 +282,7 @@ const result = {
     commitAfter: process.env.COMMIT_AFTER || null,
   },
   build: { status: "skipped" },
+  dashboardBuildDist: { status: "skipped", logPath: null },
   review: {
     status: "skipped",
     approved: true,
@@ -328,6 +329,31 @@ NODE
   build_status="success"
   if ! spawn_build "$project_id" "$repo_path" "$state_dir" >>"$build_log" 2>&1; then
     build_status="failed"
+  fi
+
+  # 3a. dashboard build-dist — refresh flat staging <state_dir>/dashboard-dist.
+  # Runs after a successful build; Method A: `project-state publish` promotes
+  # the flat staging into `versions/<vid>/dashboard-dist/`. build-dist failure
+  # is a warning (dashboardBuildDist.status=failed) and does NOT block publish
+  # or fail nightly overallStatus, so a build+graph success still lands.
+  # Plugin root is auto-resolved by the CLI (matches `build`); pass an explicit
+  # --plugin-root only when UA_PLUGIN_ROOT is set.
+  dashboard_build_dist_status="skipped"
+  dashboard_build_dist_log="$log_dir/dashboard-build-dist.log"
+  if [[ "$build_status" == "success" ]]; then
+    dashboard_build_dist_cmd=(understand_anyway dashboard build-dist
+      --project "$project_id"
+      --rebuild-dashboard)
+    if [[ -n "${UA_PLUGIN_ROOT:-}" ]]; then
+      dashboard_build_dist_cmd+=(--plugin-root "$UA_PLUGIN_ROOT")
+    fi
+    if run_or_print "${dashboard_build_dist_cmd[@]}" >>"$dashboard_build_dist_log" 2>&1; then
+      dashboard_build_dist_status="success"
+    else
+      dashboard_build_dist_status="failed"
+      printf '[nightly-project-sync] project=%s dashboard build-dist failed (warning; publish will proceed)\n' \
+        "$project_id" >&2
+    fi
   fi
 
   # 3b. publish into versions/<vid>/ when build succeeds so prod runtime serves
@@ -406,6 +432,7 @@ NODE
   GIT_PULL_STATUS="$git_pull_status" GIT_PULL_SKIPPED="$git_pull_skipped" \
   COMMIT_BEFORE="$commit_before" COMMIT_AFTER="$commit_after" \
   BUILD_STATUS="$build_status" PUBLISH_STATUS="$publish_status" PUBLISH_LOG="$publish_log" \
+  DASHBOARD_BUILD_DIST_STATUS="$dashboard_build_dist_status" DASHBOARD_BUILD_DIST_LOG="$dashboard_build_dist_log" \
   GATE_STATUS="$gate_status" GATE_APPROVED="$gate_approved" GATE_FAILURE_REASON="$gate_failure_reason" \
   GATE_ISSUES="$gate_issues" GATE_WARNINGS="$gate_warnings" GATE_STATS="$gate_stats" \
   REVIEW_STATUS="$review_status" REVIEW_FAILURE_REASON="$review_failure_reason" \
@@ -456,6 +483,10 @@ const result = {
   publish: {
     status: process.env.PUBLISH_STATUS,
     logPath: process.env.PUBLISH_LOG || null,
+  },
+  dashboardBuildDist: {
+    status: process.env.DASHBOARD_BUILD_DIST_STATUS,
+    logPath: process.env.DASHBOARD_BUILD_DIST_LOG || null,
   },
   review: {
     status: process.env.REVIEW_STATUS,

@@ -41,7 +41,15 @@ export async function runDashboard(args: DashboardArgs, deps: RunDashboardDeps =
 
   if (args.action === "start") {
     const ctx = resolveProjectContext(args.projectId);
-    const distDir = resolveProjectDistDir(ctx.stateRoot);
+    // When `--plugin-root` is supplied, `runDashboardStart` will invoke
+    // buildDashboardDist which now (Method A) only ever writes to the flat
+    // staging location. Point serve at the flat staging so the built-vs-served
+    // consistency check inside `runDashboardStart` passes. Without --plugin-root,
+    // no rebuild happens, so keep the versioned-current preference so callers
+    // that have already published see the promoted dist.
+    const distDir = args.pluginRoot
+      ? resolve(ctx.stateRoot, "dashboard-dist")
+      : resolveProjectDistDir(ctx.stateRoot);
     const startArgs: DashboardStartArgs = {
       stateDir: ctx.stateRoot,
       distDir,
@@ -67,7 +75,17 @@ export async function runDashboard(args: DashboardArgs, deps: RunDashboardDeps =
   }
   if (args.action === "build-dist") {
     const ctx = resolveProjectContext(args.projectId);
-    await buildDashboardDist(resolve(args.pluginRoot), ctx.stateRoot, {
+    // Auto-resolve upstream plugin root when not supplied, matching the `build`
+    // command so nightly/prod (where UA_PLUGIN_ROOT is unset) still works.
+    const { bootstrapUpstream } = await import("@understand-anyway/core");
+    const upstream = await bootstrapUpstream({
+      pluginRoot: args.pluginRoot ?? null,
+      requireSkillDir: true,
+      assertContract: false,
+    });
+    log(`resolving upstream plugin${args.pluginRoot ? ` (--plugin-root ${args.pluginRoot})` : ""}`);
+    log(`upstream plugin: ${upstream.pluginRoot}`);
+    await buildDashboardDist(upstream.pluginRoot, ctx.stateRoot, {
       force: args.rebuildDashboard,
       log,
     });

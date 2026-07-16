@@ -101,7 +101,11 @@ describe("buildDashboardDist", () => {
     expect(result.patchId).toBe("dashboard-viewport-v2");
   });
 
-  it("installs dashboard-dist under current/ when a versioned project state exists", async () => {
+  it("installs dashboard-dist at flat staging even when a versioned project state exists", async () => {
+    // Method A staging semantics: build-dist ALWAYS writes to <stateRoot>/dashboard-dist
+    // (flat staging). project-state publish is the sole promoter that copies the flat
+    // staging into versions/<vid>/dashboard-dist. This prevents build-dist from
+    // clobbering the currently-served version in-place via the `current` symlink.
     mkdirSync(resolve(stateRoot, "current"), { recursive: true });
 
     const { spawn } = fakeSpawn();
@@ -118,7 +122,7 @@ describe("buildDashboardDist", () => {
       patchDeps: makeFakePatchDeps(),
     }));
 
-    const expectedDist = resolve(stateRoot, "current", "dashboard-dist");
+    const expectedDist = resolve(stateRoot, "dashboard-dist");
     expect(result.distDir).toBe(expectedDist);
     expect(cp).toHaveBeenCalledWith(
       expect.stringContaining("/packages/dashboard/dist"),

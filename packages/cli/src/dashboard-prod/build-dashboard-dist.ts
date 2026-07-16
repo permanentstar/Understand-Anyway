@@ -1,6 +1,14 @@
 /**
  * `dashboard-dist/` builder — wraps the upstream plugin build.
  *
+ * Method A staging semantics: build-dist ALWAYS writes to the flat
+ * `<stateRoot>/dashboard-dist/` "staging" location, even when a versioned
+ * project state already exists (i.e. `<stateRoot>/current` symlink is live).
+ * `project-state publish` is the sole promoter that hoists the flat staging
+ * into `<stateRoot>/versions/<vid>/dashboard-dist/`. This isolation keeps
+ * build-dist from clobbering the currently-served version in-place via the
+ * `current` symlink and lets publish flip both graph + dist atomically.
+ *
  * Skips when `<stateRoot>/dashboard-dist/` already exists and is non-empty
  * unless `force` is true (`--rebuild-dashboard`). Otherwise:
  *
@@ -60,9 +68,12 @@ export interface BuildDashboardDistResult {
 
 const DASHBOARD_DIST_DIRNAME = "dashboard-dist";
 
-function resolveDashboardDistInstallDir(stateRoot: string, exists: typeof nodeExistsSync): string {
-  const versionedCurrent = resolve(stateRoot, "current");
-  if (exists(versionedCurrent)) return resolve(versionedCurrent, DASHBOARD_DIST_DIRNAME);
+/**
+ * Return the flat staging path `<stateRoot>/dashboard-dist`. Method A: build-dist
+ * always writes to flat; publish is the sole promoter into versions/<vid>/. See
+ * the module-level JSDoc for rationale.
+ */
+function resolveDashboardDistInstallDir(stateRoot: string): string {
   return resolve(stateRoot, DASHBOARD_DIST_DIRNAME);
 }
 
@@ -111,7 +122,7 @@ export async function buildDashboardDist(
   const pnpmBin = deps.pnpmBin ?? "pnpm";
   const log = deps.log ?? (() => {});
 
-  const distDir = resolveDashboardDistInstallDir(stateRoot, exists);
+  const distDir = resolveDashboardDistInstallDir(stateRoot);
 
   if (!deps.force && distExistsAndPopulated(distDir, exists, readdir)) {
     log(`dashboard-dist exists at ${distDir}; skipping build (pass --rebuild-dashboard to force)`);
