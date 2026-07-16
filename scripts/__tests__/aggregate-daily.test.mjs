@@ -32,6 +32,12 @@ function writeNightlyAggregate(projectsRoot, runId, payload) {
   writeFileSync(resolve(dir, "result.json"), JSON.stringify(payload));
 }
 
+function writeNightlyLatest(projectsRoot, payload) {
+  const dir = resolve(projectsRoot, "gateway", "operations");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(resolve(dir, "nightly-latest.json"), JSON.stringify(payload));
+}
+
 function runScript(args) {
   return spawnSync("node", [SCRIPT, ...args], { encoding: "utf8" });
 }
@@ -107,6 +113,80 @@ function runScript(args) {
     check("nightly-fail: exit 0", result.status === 0, result.stderr);
     const payload = JSON.parse(readFileSync(resolve(projectsRoot, "gateway", "operations", "daily-latest.json"), "utf8"));
     check("nightly-fail: overallStatus=partial_success", payload.overallStatus === "partial_success", JSON.stringify(payload));
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+// --- Test 2a: nightly exit 0 but aggregate partial_success must stay partial_success ---
+{
+  const work = makeTmp();
+  try {
+    const projectsRoot = resolve(work, "projects");
+    mkdirSync(projectsRoot, { recursive: true });
+    const runId = "rid2a";
+    writeNightlyAggregate(projectsRoot, runId, {
+      projectCount: 3,
+      successCount: 1,
+      skippedCount: 1,
+      failedCount: 1,
+      missingCount: 0,
+      overallStatus: "partial_success",
+    });
+
+    const result = runScript([
+      "--projects-root", projectsRoot,
+      "--run-id", runId,
+      "--nightly-status", "0",
+      "--refresh-status", "0",
+    ]);
+    check("nightly-aggregate-partial: exit 0", result.status === 0, result.stderr);
+    const payload = JSON.parse(readFileSync(resolve(projectsRoot, "gateway", "operations", "daily-latest.json"), "utf8"));
+    check(
+      "nightly-aggregate-partial: overallStatus=partial_success",
+      payload.overallStatus === "partial_success",
+      JSON.stringify(payload),
+    );
+    check(
+      "nightly-aggregate-partial: nightly summary preserved",
+      payload.nightly?.summary?.failedCount === 1 && payload.nightly?.summary?.overallStatus === "partial_success",
+      JSON.stringify(payload.nightly),
+    );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+}
+
+// --- Test 2b: daily run id may differ from nightly run id; fallback to nightly-latest ---
+{
+  const work = makeTmp();
+  try {
+    const projectsRoot = resolve(work, "projects");
+    mkdirSync(projectsRoot, { recursive: true });
+    writeNightlyLatest(projectsRoot, {
+      runId: "nightly-rid",
+      projectCount: 3,
+      successCount: 2,
+      skippedCount: 1,
+      failedCount: 0,
+      missingCount: 0,
+      overallStatus: "success",
+    });
+
+    const result = runScript([
+      "--projects-root", projectsRoot,
+      "--run-id", "daily-rid",
+      "--nightly-status", "0",
+      "--refresh-status", "0",
+    ]);
+    check("nightly-latest-fallback: exit 0", result.status === 0, result.stderr);
+    const payload = JSON.parse(readFileSync(resolve(projectsRoot, "gateway", "operations", "daily-latest.json"), "utf8"));
+    check(
+      "nightly-latest-fallback: summary read from latest",
+      payload.nightly?.summary?.projectCount === 3 && payload.nightly?.aggregatePath.endsWith("nightly-latest.json"),
+      JSON.stringify(payload.nightly),
+    );
+    check("nightly-latest-fallback: overallStatus=success", payload.overallStatus === "success", JSON.stringify(payload));
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

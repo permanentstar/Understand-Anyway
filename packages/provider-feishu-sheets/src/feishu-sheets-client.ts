@@ -34,6 +34,13 @@ interface WorksheetMeta {
   title: string;
 }
 
+interface WorksheetHeaderSchema {
+  columns: readonly string[];
+  lastColumn: string;
+}
+
+const HEADER_SCAN_COLUMNS = 256;
+
 function resolveSecret(options: FeishuSheetsClientOptions): string {
   if (options.appSecret) return options.appSecret;
   if (options.appSecretFile) {
@@ -71,7 +78,7 @@ export class FeishuSheetsClient {
   private readonly fetchImpl: FetchLike;
   private tokenCache: { value: string; expiresAt: number } | null = null;
   private readonly worksheetCache = new Map<string, WorksheetMeta>();
-  private readonly headerReady = new Set<string>();
+  private readonly headerSchemaCache = new Map<string, Map<string, WorksheetHeaderSchema>>();
 
   constructor(options: FeishuSheetsClientOptions) {
     if (!options.appId) throw new Error("FeishuSheetsClient requires appId");
@@ -163,13 +170,13 @@ export class FeishuSheetsClient {
     throw new Error(`worksheet creation returned no sheetId: ${spreadsheetToken}`);
   }
 
-  async ensureHeader(spreadsheetToken: string, sheetId: string, header: string[]): Promise<void> {
-    const cacheKey = `${spreadsheetToken}:${sheetId}`;
-    if (this.headerReady.has(cacheKey)) return;
+  async ensureHeader(spreadsheetToken: string, sheetId: string, header: string[]): Promise<readonly string[]> {
+    const cached = this.getCachedHeaderSchema(spreadsheetToken, sheetId);
+    if (cached) return [...cached.columns];
     const accessToken = await this.getTenantAccessToken();
-    const lastCol = columnLetter(header.length);
+    const readLastCol = columnLetter(Math.max(header.length, HEADER_SCAN_COLUMNS));
     const data = await this.request(
-      `/open-apis/sheets/v2/spreadsheets/${encodeURIComponent(spreadsheetToken)}/values/${encodeURIComponent(`${sheetId}!A1:${lastCol}1`)}`,
+      `/open-apis/sheets/v2/spreadsheets/${encodeURIComponent(spreadsheetToken)}/values/${encodeURIComponent(`${sheetId}!A1:${readLastCol}1`)}`,
       {
         accessToken,
         query: { valueRenderOption: "ToString", dateTimeRenderOption: "FormattedString" },
@@ -177,19 +184,19 @@ export class FeishuSheetsClient {
       },
     );
     const valueRange = data.valueRange as { values?: unknown[][] } | undefined;
-    const firstRow = Array.isArray(valueRange?.values?.[0]) ? valueRange!.values![0]! : [];
-    const matches = header.every((cell, i) => String(firstRow[i] ?? "") === cell);
-    if (matches) {
-      this.headerReady.add(cacheKey);
-      return;
+    const firstRow = normalizeHeaderRow(Array.isArray(valueRange?.values?.[0]) ? valueRange!.values![0]! : []);
+    if (firstRow.length > 0) {
+      validateHeader(firstRow, spreadsheetToken, sheetId);
+      return [...this.cacheHeaderSchema(spreadsheetToken, sheetId, firstRow).columns];
     }
+    const initialSchema = buildWorksheetHeaderSchema(header);
     await this.request(`/open-apis/sheets/v2/spreadsheets/${encodeURIComponent(spreadsheetToken)}/values`, {
       method: "PUT",
       accessToken,
-      body: { valueRange: { range: `${sheetId}!A1:${lastCol}1`, values: [header] } },
+      body: { valueRange: { range: `${sheetId}!A1:${initialSchema.lastColumn}1`, values: [header] } },
       errorMessage: `failed to initialize header: ${spreadsheetToken}`,
     });
-    this.headerReady.add(cacheKey);
+    return [...this.cacheHeaderSchema(spreadsheetToken, sheetId, header).columns];
   }
 
   async appendRow(spreadsheetToken: string, sheetId: string, row: string[]): Promise<void> {
@@ -203,6 +210,25 @@ export class FeishuSheetsClient {
       errorMessage: `failed to append row: ${spreadsheetToken}`,
     });
   }
+
+  private getCachedHeaderSchema(
+    spreadsheetToken: string,
+    sheetId: string,
+  ): WorksheetHeaderSchema | undefined {
+    return this.headerSchemaCache.get(spreadsheetToken)?.get(sheetId);
+  }
+
+  private cacheHeaderSchema(
+    spreadsheetToken: string,
+    sheetId: string,
+    columns: string[],
+  ): WorksheetHeaderSchema {
+    const schema = buildWorksheetHeaderSchema(columns);
+    const workbook = this.headerSchemaCache.get(spreadsheetToken) ?? new Map<string, WorksheetHeaderSchema>();
+    workbook.set(sheetId, schema);
+    this.headerSchemaCache.set(spreadsheetToken, workbook);
+    return schema;
+  }
 }
 
 /** 1 -> A, 26 -> Z, 27 -> AA. */
@@ -215,4 +241,37 @@ export function columnLetter(count: number): string {
     n = Math.floor((n - 1) / 26);
   }
   return letters;
+}
+
+function buildWorksheetHeaderSchema(columns: string[]): WorksheetHeaderSchema {
+  const snapshot = Object.freeze([...columns]) as readonly string[];
+  return {
+    columns: snapshot,
+    lastColumn: columnLetter(snapshot.length),
+  };
+}
+
+function normalizeHeaderRow(row: unknown[]): string[] {
+  const normalized = row.map((cell) => String(cell ?? "").trim());
+  while (normalized.length > 0 && normalized[normalized.length - 1] === "") {
+    normalized.pop();
+  }
+  return normalized;
+}
+
+function validateHeader(header: string[], spreadsheetToken: string, sheetId: string): void {
+  if (header.some((cell) => cell === "")) {
+    throw new Error(`invalid worksheet header (blank column) for ${spreadsheetToken}:${sheetId}`);
+  }
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const cell of header) {
+    if (seen.has(cell)) duplicates.add(cell);
+    seen.add(cell);
+  }
+  if (duplicates.size > 0) {
+    throw new Error(
+      `invalid worksheet header (duplicate columns: ${[...duplicates].join(", ")}) for ${spreadsheetToken}:${sheetId}`,
+    );
+  }
 }

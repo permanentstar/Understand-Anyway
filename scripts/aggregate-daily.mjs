@@ -125,19 +125,21 @@ function parseArgs(argv) {
 
 function readNightlyAggregate({ projectsRoot, runId }) {
   const path = resolve(projectsRoot, "gateway", "operations", "nightly-runs", runId, "result.json");
-  if (!existsSync(path)) {
-    return { path, payload: null };
-  }
+  const latestPath = resolve(projectsRoot, "gateway", "operations", "nightly-latest.json");
+  const candidatePath = existsSync(path) ? path : latestPath;
+  if (!existsSync(candidatePath)) return { path, payload: null };
   try {
-    return { path, payload: JSON.parse(readFileSync(path, "utf8")) };
+    return { path: candidatePath, payload: JSON.parse(readFileSync(candidatePath, "utf8")) };
   } catch (err) {
-    return { path, payload: null, error: err.message };
+    return { path: candidatePath, payload: null, error: err.message };
   }
 }
 
-function classifyOverall({ refreshStatus, nightlyStatus, gatewayPublished }) {
+function classifyOverall({ refreshStatus, nightlyStatus, gatewayPublished, nightlyOverallStatus }) {
   if (gatewayPublished === false) return "failed";
   if (refreshStatus !== 0 && refreshStatus !== null) return "failed";
+  if (nightlyOverallStatus === "failed" || nightlyOverallStatus === "missing") return "failed";
+  if (nightlyOverallStatus === "partial_success") return "partial_success";
   if (nightlyStatus !== 0 && nightlyStatus !== null) return "partial_success";
   if (refreshStatus === null && nightlyStatus === null) return "skipped";
   return "success";
@@ -163,6 +165,7 @@ function main() {
     refreshStatus: args.refreshStatus,
     nightlyStatus: args.nightlyStatus,
     gatewayPublished: args.gatewayPublished,
+    nightlyOverallStatus: nightly.payload?.overallStatus,
   });
 
   const aggregate = {

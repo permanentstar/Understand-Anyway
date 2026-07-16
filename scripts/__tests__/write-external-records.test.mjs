@@ -5,8 +5,7 @@
 // write-external-records.mjs with a mock Feishu Sheets client and assert
 // (a) each configured column has a value in the appended row, so no field name
 //     silently drifts from the payload keys, and
-// (b) the header PUT payload equals the column list (so the sheet header is
-//     kept in sync automatically).
+// (b) a blank sheet still initializes its header from the configured columns.
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,6 +27,64 @@ const {
   buildProjectEnvelopes,
   resolveRuntime,
 } = await import(new URL("../write-external-records.mjs", import.meta.url).href);
+
+const EXPECTED_NIGHTLY_COLUMNS = [
+  "runId",
+  "startedAt",
+  "finishedAt",
+  "overallStatus",
+  "projectCount",
+  "successCount",
+  "failedCount",
+  "buildSuccessCount",
+  "recordProvider",
+  "recordStatus",
+  "resultJson",
+];
+
+const EXPECTED_PROJECT_COLUMNS = [
+  "runId",
+  "startedAt",
+  "finishedAt",
+  "project",
+  "repoPath",
+  "stateDir",
+  "overallStatus",
+  "buildStatus",
+  "gateStatus",
+  "gateApproved",
+  "gateFailureReason",
+  "criticalCount",
+  "warningCount",
+  "needsManualIntervention",
+  "commitBefore",
+  "commitAfter",
+  "nodeCount",
+  "edgeCount",
+  "containsEdges",
+  "importsEdges",
+  "callsEdges",
+  "fileNodeCount",
+  "missingFileCount",
+  "moduleStatus",
+  "llmEnabled",
+  "llmStatus",
+  "llmProvider",
+  "llmModel",
+  "llmRequests",
+  "llmTasks",
+  "llmProcessedTasks",
+  "llmFailures",
+  "llmTimeouts",
+  "llmCandidateFiles",
+  "llmProcessedFiles",
+  "llmBreakerTripped",
+  "llmEnrichedNodes",
+  "resultJson",
+  "buildLog",
+  "gateJson",
+  "gateLog",
+];
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -53,6 +110,10 @@ const aggregateFixture = {
   successCount: 0,
   failedCount: 1,
   buildSuccessCount: 0,
+  records: {
+    provider: "feishu",
+    status: "success",
+  },
   logs: {
     result:
       "/home/suheng.cloud/understand-anyway-projects/gateway/operations/nightly-runs/20260714-170836/result.json",
@@ -84,12 +145,31 @@ const aggregateFixture = {
         failureReason: "build_failed",
         jsonPath: "/tmp/review.json",
         logPath: "/tmp/review.log",
+        stats: {
+          nodeCount: 11,
+          edgeCount: 12,
+          containsEdges: 13,
+          importsEdges: 14,
+          callsEdges: 15,
+          fileNodeCount: 16,
+          missingFileCount: 17,
+          moduleStatus: { cli: "active", portal: "active" },
+        },
       },
       llm: {
         enabled: true,
         status: "skipped",
         provider: "trae-cli-v1",
         model: "Qwen3.6-Plus",
+        requests: 21,
+        tasks: 22,
+        processedTasks: 23,
+        failures: 24,
+        timeouts: 25,
+        candidateFiles: 26,
+        processedFiles: 27,
+        breakerTripped: false,
+        enrichedNodes: 28,
       },
       logs: {
         result: "/tmp/nightly-result.json",
@@ -196,6 +276,17 @@ async function run() {
     },
   });
 
+  check(
+    "nightly columns match legacy deploy schema",
+    JSON.stringify(NIGHTLY_COLUMNS) === JSON.stringify(EXPECTED_NIGHTLY_COLUMNS),
+    JSON.stringify(NIGHTLY_COLUMNS),
+  );
+  check(
+    "project columns match legacy deploy schema",
+    JSON.stringify(PROJECT_COLUMNS) === JSON.stringify(EXPECTED_PROJECT_COLUMNS),
+    JSON.stringify(PROJECT_COLUMNS),
+  );
+
   await provider.write(buildNightlyEnvelope(aggregateFixture));
   for (const envelope of buildProjectEnvelopes(aggregateFixture)) {
     await provider.write(envelope);
@@ -249,37 +340,39 @@ async function run() {
     check("project row length matches columns", row.length === PROJECT_COLUMNS.length);
     // Spot-check dotted-path columns that historically drifted:
     const idx = (name) => PROJECT_COLUMNS.indexOf(name);
-    check("project build.status = 'failed'", row[idx("build.status")] === "failed");
-    check("project gate.status = 'skipped'", row[idx("gate.status")] === "skipped");
-    check("project gate.approved = 'false'", row[idx("gate.approved")] === "false");
+    check("project buildStatus = 'failed'", row[idx("buildStatus")] === "failed");
+    check("project gateStatus = 'skipped'", row[idx("gateStatus")] === "skipped");
+    check("project gateApproved = 'false'", row[idx("gateApproved")] === "false");
     check(
       "project git.commitBefore matches fixture",
-      row[idx("git.commitBefore")] === aggregateFixture.projects[0].git.commitBefore,
+      row[idx("commitBefore")] === aggregateFixture.projects[0].git.commitBefore,
     );
     check(
       "project git.commitAfter matches fixture",
-      row[idx("git.commitAfter")] === aggregateFixture.projects[0].git.commitAfter,
+      row[idx("commitAfter")] === aggregateFixture.projects[0].git.commitAfter,
     );
     check(
-      "project llm.provider column resolves (not llm.providerName)",
-      row[idx("llm.provider")] === "trae-cli-v1",
-      `got ${JSON.stringify(row[idx("llm.provider")])}`,
+      "project llmProvider column resolves",
+      row[idx("llmProvider")] === "trae-cli-v1",
+      `got ${JSON.stringify(row[idx("llmProvider")])}`,
     );
+    check("project nodeCount resolves", row[idx("nodeCount")] === "11", `got ${JSON.stringify(row[idx("nodeCount")])}`);
+    check("project moduleStatus resolves", row[idx("moduleStatus")] === "cli:active,portal:active", `got ${JSON.stringify(row[idx("moduleStatus")])}`);
     check(
       "project logs.result matches fixture",
-      row[idx("logs.result")] === aggregateFixture.projects[0].logs.result,
+      row[idx("resultJson")] === aggregateFixture.projects[0].logs.result,
     );
     check(
       "project logs.build matches fixture",
-      row[idx("logs.build")] === aggregateFixture.projects[0].logs.build,
+      row[idx("buildLog")] === aggregateFixture.projects[0].logs.build,
     );
     check(
       "project gate.jsonPath matches fixture",
-      row[idx("gate.jsonPath")] === aggregateFixture.projects[0].gate.jsonPath,
+      row[idx("gateJson")] === aggregateFixture.projects[0].gate.jsonPath,
     );
     check(
       "project gate.logPath matches fixture",
-      row[idx("gate.logPath")] === aggregateFixture.projects[0].gate.logPath,
+      row[idx("gateLog")] === aggregateFixture.projects[0].gate.logPath,
     );
   }
 

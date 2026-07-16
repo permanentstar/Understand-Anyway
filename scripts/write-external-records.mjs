@@ -184,6 +184,8 @@ export const NIGHTLY_COLUMNS = [
   "successCount",
   "failedCount",
   "buildSuccessCount",
+  "recordProvider",
+  "recordStatus",
   "resultJson",
 ];
 
@@ -191,22 +193,44 @@ export const PROJECT_COLUMNS = [
   "runId",
   "startedAt",
   "finishedAt",
-  "projectName",
+  "project",
   "repoPath",
   "stateDir",
   "overallStatus",
-  "build.status",
-  "gate.status",
-  "gate.approved",
-  "failureReason",
+  "buildStatus",
+  "gateStatus",
+  "gateApproved",
+  "gateFailureReason",
+  "criticalCount",
+  "warningCount",
   "needsManualIntervention",
-  "git.commitBefore",
-  "git.commitAfter",
-  "llm.provider",
-  "logs.result",
-  "logs.build",
-  "gate.jsonPath",
-  "gate.logPath",
+  "commitBefore",
+  "commitAfter",
+  "nodeCount",
+  "edgeCount",
+  "containsEdges",
+  "importsEdges",
+  "callsEdges",
+  "fileNodeCount",
+  "missingFileCount",
+  "moduleStatus",
+  "llmEnabled",
+  "llmStatus",
+  "llmProvider",
+  "llmModel",
+  "llmRequests",
+  "llmTasks",
+  "llmProcessedTasks",
+  "llmFailures",
+  "llmTimeouts",
+  "llmCandidateFiles",
+  "llmProcessedFiles",
+  "llmBreakerTripped",
+  "llmEnrichedNodes",
+  "resultJson",
+  "buildLog",
+  "gateJson",
+  "gateLog",
 ];
 
 export function buildNightlyEnvelope(aggregate) {
@@ -222,31 +246,78 @@ export function buildNightlyEnvelope(aggregate) {
       successCount: Number(aggregate.successCount || 0),
       failedCount: Number(aggregate.failedCount || 0),
       buildSuccessCount: Number(aggregate.buildSuccessCount || 0),
+      recordProvider: aggregate.records?.provider || aggregate.feishu?.provider || "",
+      recordStatus: aggregate.records?.status || aggregate.feishu?.status || "",
       resultJson: aggregate.logs?.result || "",
     },
   };
+}
+
+function summarizeModuleStatus(stats) {
+  const moduleStatus = stats?.moduleStatus;
+  if (!moduleStatus || typeof moduleStatus !== "object" || Array.isArray(moduleStatus)) return "";
+  return Object.entries(moduleStatus).map(([key, value]) => `${key}:${value}`).join(",");
 }
 
 function buildProjectEnvelopes(aggregate) {
   return (Array.isArray(aggregate.projects) ? aggregate.projects : []).map((project) => ({
     kind: "project-update",
     timestamp: project.finishedAt || aggregate.finishedAt || new Date().toISOString(),
-    payload: {
+    payload: (() => {
+      const gate = project.gate || project.review || {};
+      const stats = gate.stats || {};
+      const llm = project.llm || stats.llm || {};
+      return {
       runId: aggregate.runId || project.runId || "",
       startedAt: project.startedAt || aggregate.startedAt || "",
       finishedAt: project.finishedAt || aggregate.finishedAt || "",
+      project: project.projectName || "",
       projectName: project.projectName || "",
       repoPath: project.repoPath || "",
       stateDir: project.stateDir || "",
       overallStatus: project.overallStatus || "",
       failureReason: project.failureReason || "",
       needsManualIntervention: Boolean(project.needsManualIntervention),
+      buildStatus: project.build?.status || "",
+      gateStatus: gate.status || project.review?.status || "",
+      gateApproved: Boolean(gate.approved ?? project.review?.approved),
+      gateFailureReason: gate.failureReason || project.failureReason || project.review?.failureReason || "",
+      criticalCount: Number(gate.criticalCount ?? project.review?.issueCount ?? 0),
+      warningCount: Number(gate.warningCount ?? project.review?.warningCount ?? 0),
+      commitBefore: project.git?.commitBefore || "",
+      commitAfter: project.git?.commitAfter || "",
+      nodeCount: Number(stats.nodeCount || 0),
+      edgeCount: Number(stats.edgeCount || 0),
+      containsEdges: Number(stats.containsEdges || 0),
+      importsEdges: Number(stats.importsEdges || 0),
+      callsEdges: Number(stats.callsEdges || 0),
+      fileNodeCount: Number(stats.fileNodeCount || 0),
+      missingFileCount: Number(stats.missingFileCount || 0),
+      moduleStatus: summarizeModuleStatus(stats),
+      llmEnabled: Boolean(llm.enabled),
+      llmStatus: llm.status || "",
+      llmProvider: llm.provider || "",
+      llmModel: llm.model || "",
+      llmRequests: Number(llm.requests || 0),
+      llmTasks: Number(llm.tasks || 0),
+      llmProcessedTasks: Number(llm.processedTasks || 0),
+      llmFailures: Number(llm.failures || 0),
+      llmTimeouts: Number(llm.timeouts || 0),
+      llmCandidateFiles: Number(llm.candidateFiles || 0),
+      llmProcessedFiles: Number(llm.processedFiles || 0),
+      llmBreakerTripped: Boolean(llm.breakerTripped),
+      llmEnrichedNodes: Number(llm.enrichedNodes || 0),
+      resultJson: project.logs?.result || "",
+      buildLog: project.logs?.build || "",
+      gateJson: gate.jsonPath || project.review?.jsonPath || "",
+      gateLog: gate.logPath || project.logs?.review || "",
       build: project.build || {},
       gate: project.gate || {},
       git: project.git || {},
       logs: project.logs || {},
       llm: project.llm || {},
-    },
+      };
+    })(),
   }));
 }
 
@@ -259,6 +330,14 @@ function mappingFor(recordConfig, kind, fallbackWorksheet, fallbackColumns) {
     columns: Array.isArray(configured?.columns) && configured.columns.length > 0
       ? configured.columns.map(String)
       : fallbackColumns,
+    aliases: configured?.aliases && typeof configured.aliases === "object"
+      ? Object.fromEntries(
+          Object.entries(configured.aliases).map(([key, value]) => [
+            String(key),
+            Array.isArray(value) ? value.map(String) : String(value),
+          ]),
+        )
+      : undefined,
   };
 }
 
@@ -296,8 +375,16 @@ async function writeFeishu(args, runtime, aggregate) {
     log: (message) => process.stderr.write(`${message}\n`),
   });
 
-  await provider.write(buildNightlyEnvelope(aggregate));
-  for (const envelope of buildProjectEnvelopes(aggregate)) {
+  const recordAwareAggregate = {
+    ...aggregate,
+    records: {
+      ...(aggregate.records ?? {}),
+      provider: aggregate.records?.provider || "feishu",
+      status: aggregate.records?.status || "success",
+    },
+  };
+  await provider.write(buildNightlyEnvelope(recordAwareAggregate));
+  for (const envelope of buildProjectEnvelopes(recordAwareAggregate)) {
     await provider.write(envelope);
   }
   process.stdout.write(

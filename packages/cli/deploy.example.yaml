@@ -32,6 +32,11 @@ deploy:
 # current + stable releases on top of `retain` non-protected ones.
 gateway:
   retain: 3
+  # Optional environment-scoped asset mode switch. Omit this to keep pure OSS
+  # behavior (`<projectsRoot>/gateway/portal-assets/`). Set a relative subdir
+  # such as "overlay" to serve all convention assets from
+  # `<projectsRoot>/gateway/portal-assets/overlay/` instead.
+  # portalAssetsSubdir: "overlay"
 
 # Dynamically loaded providers. `package` is the only source of provider package
 # names; `config` is passed verbatim to the package's factory export.
@@ -77,7 +82,33 @@ record:
       worksheets:
         nightly: "nightly-update"
         project: "project-update"
-      mappings: {}
+      mappings:
+        user-event:
+          worksheet: "user-event"
+          columns:
+            ["eventId", "eventTime", "eventType", "sessionId", "userName",
+             "userEnName", "openId", "email", "authReason", "departmentPaths",
+             "sourceIp", "userAgent", "targetType", "targetId", "targetName",
+             "targetUrl", "extra"]
+        nightly-update:
+          worksheet: "nightly-update"
+          columns:
+            ["runId", "startedAt", "finishedAt", "overallStatus", "projectCount",
+             "successCount", "failedCount", "buildSuccessCount", "recordProvider",
+             "recordStatus", "resultJson"]
+        project-update:
+          worksheet: "project-update"
+          columns:
+            ["runId", "startedAt", "finishedAt", "project", "repoPath", "stateDir",
+             "overallStatus", "buildStatus", "gateStatus", "gateApproved",
+             "gateFailureReason", "criticalCount", "warningCount",
+             "needsManualIntervention", "commitBefore", "commitAfter", "nodeCount",
+             "edgeCount", "containsEdges", "importsEdges", "callsEdges",
+             "fileNodeCount", "missingFileCount", "moduleStatus", "llmEnabled",
+             "llmStatus", "llmProvider", "llmModel", "llmRequests", "llmTasks",
+             "llmProcessedTasks", "llmFailures", "llmTimeouts", "llmCandidateFiles",
+             "llmProcessedFiles", "llmBreakerTripped", "llmEnrichedNodes",
+             "resultJson", "buildLog", "gateJson", "gateLog"]
 
 # Deployment environment profiles. Build spec follows deploy profile:
 # ppe = small, prod = large. Later environments can copy this pattern.
