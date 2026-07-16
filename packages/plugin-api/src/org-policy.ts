@@ -11,6 +11,14 @@ import type { AuthedUser } from "./auth.js";
 export interface OrgPolicyDecision {
   allowed: boolean;
   reason?: string;
+  /** Stable audit reason to expose in user-event sinks; defaults to `reason` when absent. */
+  authReason?: string;
+  /** Candidate department paths observed for the user, as path segment arrays. */
+  departmentPaths?: string[][];
+  /** The user department path that matched the policy, when access is allowed by department. */
+  matchedDepartmentPath?: string[];
+  /** Configured target department path for the policy decision. */
+  targetDepartment?: string[];
   /** Optional provider-supplied denial HTML; gateway renders neutral 403 when absent. */
   html?: string;
 }

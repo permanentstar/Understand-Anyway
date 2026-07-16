@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type {
   AuthBeginResult,
@@ -114,6 +114,37 @@ describe("AuthGate with an enabled provider", () => {
     expect(token).toBeTruthy();
     expect(sessions.get(token)?.user.id).toBe("u1");
     expect(sink.headers["Set-Cookie"]).toContain("Max-Age=604800");
+  });
+
+  it("calls the login success hook once after a successful callback", async () => {
+    const sessions = new SessionStore({ cookieName: "ua" });
+    const onLoginSuccess = vi.fn();
+    const gate = new AuthGate({ provider: new StubProvider(), sessions, onLoginSuccess });
+    const { res } = makeRes();
+    const req = makeReq("/auth/callback?ok=1");
+    const url = new URL("http://h/auth/callback?ok=1");
+
+    await gate.handle(req, res, url);
+
+    expect(onLoginSuccess).toHaveBeenCalledTimes(1);
+    expect(onLoginSuccess.mock.calls[0]![0]).toMatchObject({
+      session: { user: { id: "u1", displayName: "User One" } },
+      token: expect.any(String),
+      redirectTo: "/project/demo/",
+    });
+    expect(onLoginSuccess.mock.calls[0]![0].req).toBe(req);
+    expect(onLoginSuccess.mock.calls[0]![0].url).toBe(url);
+  });
+
+  it("does not call the login success hook for a denied callback", async () => {
+    const sessions = new SessionStore({ cookieName: "ua" });
+    const onLoginSuccess = vi.fn();
+    const gate = new AuthGate({ provider: new StubProvider(), sessions, onLoginSuccess });
+    const { res } = makeRes();
+
+    await gate.handle(makeReq("/auth/callback?ok=0"), res, new URL("http://h/auth/callback?ok=0"));
+
+    expect(onLoginSuccess).not.toHaveBeenCalled();
   });
 
   it("renders a neutral 403 on a denied callback", async () => {

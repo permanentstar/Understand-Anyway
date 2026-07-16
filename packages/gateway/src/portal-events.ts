@@ -18,6 +18,10 @@ export interface PortalEventInput {
   targetId?: string;
   targetName?: string;
   targetUrl?: string;
+  authReason?: string;
+  departmentPaths?: string[][];
+  matchedDepartmentPath?: string[];
+  targetDepartment?: string[];
   extra?: Record<string, unknown>;
 }
 
@@ -59,6 +63,10 @@ export function buildUserEventPayload(
       targetId: input.targetId ?? "",
       targetName: input.targetName ?? "",
       targetUrl: input.targetUrl ?? "",
+      authReason: input.authReason ?? "",
+      departmentPaths: input.departmentPaths ?? [],
+      matchedDepartmentPath: input.matchedDepartmentPath ?? [],
+      targetDepartment: input.targetDepartment ?? [],
       extra: input.extra ?? {},
       raw: user?.raw ?? {},
     },

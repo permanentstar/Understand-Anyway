@@ -48,6 +48,27 @@ describe("buildUserEventPayload", () => {
     expect(env.payload.raw).toEqual({ open_id: "ou_x", departmentPaths: ["A/B"] });
   });
 
+  it("copies org audit fields to stable top-level payload keys", () => {
+    const env = buildUserEventPayload(
+      session({ id: "u2", raw: { open_id: "ou_x" } }),
+      fakeReq(),
+      {
+        eventType: "project_view",
+        authReason: "department_exact_match",
+        departmentPaths: [["Data", "Allowed"]],
+        matchedDepartmentPath: ["Data", "Allowed"],
+        targetDepartment: ["Data"],
+        extra: { reason: "department_exact_match" },
+      },
+    );
+
+    expect(env.payload.authReason).toBe("department_exact_match");
+    expect(env.payload.departmentPaths).toEqual([["Data", "Allowed"]]);
+    expect(env.payload.matchedDepartmentPath).toEqual(["Data", "Allowed"]);
+    expect(env.payload.targetDepartment).toEqual(["Data"]);
+    expect(env.payload.extra).toEqual({ reason: "department_exact_match" });
+  });
+
   it("prefers x-forwarded-for for the client ip", () => {
     const env = buildUserEventPayload(
       null,
@@ -84,6 +105,10 @@ describe("buildUserEventPayload", () => {
       "targetId",
       "targetName",
       "targetUrl",
+      "authReason",
+      "departmentPaths",
+      "matchedDepartmentPath",
+      "targetDepartment",
       "extra",
       "raw",
     ];

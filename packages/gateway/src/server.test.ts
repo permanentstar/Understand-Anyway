@@ -6,7 +6,15 @@ import type { AddressInfo } from "node:net";
 import { createGatewayServer, startGatewayServer } from "./server.js";
 import { ProjectRegistryStore } from "./project-registry.js";
 import type { Server } from "node:http";
-import type { AuthProvider, RecordEnvelope } from "@understand-anyway/plugin-api";
+import type {
+  AuthBeginResult,
+  AuthCallbackResult,
+  AuthProvider,
+  AuthRequestContext,
+  AuthResult,
+  AuthSession,
+  RecordEnvelope,
+} from "@understand-anyway/plugin-api";
 
 const TOKEN = "runtime-token-xyz";
 
@@ -394,12 +402,32 @@ describe("gateway server with a record provider", () => {
       JSON.stringify({ nodes: [] }),
     );
 
+    const betaState = join(rWorkdir, "beta-state");
+    const betaDist = join(rWorkdir, "beta-dist");
+    mkdirSync(join(betaState, ".understand-anything"), { recursive: true });
+    mkdirSync(betaDist, { recursive: true });
+    writeFileSync(
+      join(betaState, ".understand-anything", "knowledge-graph.json"),
+      JSON.stringify({ nodes: [] }),
+    );
+    writeFileSync(join(betaDist, "index.html"), "<!doctype html><html><body>beta</body></html>");
+    writeFileSync(join(betaDist, "app.js"), "console.log('beta')");
+    writeFileSync(join(betaDist, "config.json"), JSON.stringify({ project: "beta" }));
+
     const registryPath = join(rWorkdir, "registry.json");
-    new ProjectRegistryStore(registryPath).upsert("alpha", join(rWorkdir, "alpha-repo"), projState, {
+    const registry = new ProjectRegistryStore(registryPath);
+    registry.upsert("alpha", join(rWorkdir, "alpha-repo"), projState, {
       name: "Alpha",
       runtimeMode: "prod",
       prodDistDir: projDist,
       prodToken: "alpha-tok",
+      status: "running",
+    });
+    registry.upsert("beta", join(rWorkdir, "beta-repo"), betaState, {
+      name: "Beta",
+      runtimeMode: "prod",
+      prodDistDir: betaDist,
+      prodToken: "beta-tok",
       status: "running",
     });
 
@@ -415,8 +443,21 @@ describe("gateway server with a record provider", () => {
         name: "deny-alpha",
         async canAccessProject(_user, projectId) {
           return projectId === "alpha"
-            ? { allowed: false, reason: "department_scope_not_authorized" }
-            : { allowed: true };
+            ? {
+                allowed: false,
+                reason: "department_scope_not_authorized",
+                authReason: "department_scope_not_authorized",
+                departmentPaths: [["Data", "Other"]],
+                targetDepartment: ["Data", "Allowed"],
+              }
+            : {
+                allowed: true,
+                reason: "department_exact_match",
+                authReason: "department_exact_match",
+                departmentPaths: [["Data", "Allowed"]],
+                matchedDepartmentPath: ["Data", "Allowed"],
+                targetDepartment: ["Data", "Allowed"],
+              };
         },
       },
       record: {
@@ -444,6 +485,140 @@ describe("gateway server with a record provider", () => {
     expect(events[0]!.kind).toBe("user-event");
     expect(events[0]!.payload.eventType).toBe("authz_denied");
     expect(events[0]!.payload.targetId).toBe("alpha");
+  });
+
+  it("records one project_view for a project page click that follows the runtime-token redirect", async () => {
+    const res = await fetch(`${rBase}/project/beta/`, {
+      headers: { accept: "text/html" },
+    });
+    expect(res.status).toBe(200);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const projectViews = events.filter((event) => event.payload.eventType === "project_view");
+    expect(projectViews).toHaveLength(1);
+    expect(projectViews[0]!.payload.targetId).toBe("beta");
+    expect(projectViews[0]!.payload.authReason).toBe("department_exact_match");
+    expect(projectViews[0]!.payload.departmentPaths).toEqual([["Data", "Allowed"]]);
+  });
+
+  it("does not record project_view for project assets or JSON artifacts", async () => {
+    await fetch(`${rBase}/project/beta/app.js?token=beta-tok`);
+    await fetch(`${rBase}/project/beta/config.json?token=beta-tok`);
+    await fetch(`${rBase}/project/beta/knowledge-graph.json?token=beta-tok`);
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(events.filter((event) => event.payload.eventType === "project_view")).toHaveLength(0);
+  });
+
+  it("keeps authz_denied recording for project JSON requests and includes org audit fields", async () => {
+    const res = await fetch(`${rBase}/project/alpha/knowledge-graph.json?token=alpha-tok`);
+    expect(res.status).toBe(403);
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(events).toHaveLength(1);
+    expect(events[0]!.payload.eventType).toBe("authz_denied");
+    expect(events[0]!.payload.authReason).toBe("department_scope_not_authorized");
+    expect(events[0]!.payload.departmentPaths).toEqual([["Data", "Other"]]);
+    expect(events[0]!.payload.extra).toMatchObject({
+      reason: "department_scope_not_authorized",
+      authReason: "department_scope_not_authorized",
+      targetDepartment: ["Data", "Allowed"],
+    });
+  });
+});
+
+class CallbackLoginProvider implements AuthProvider {
+  readonly name = "callback-login";
+
+  async authenticate(_ctx: AuthRequestContext, session?: AuthSession | null): Promise<AuthResult> {
+    return session ? { authenticated: true, user: session.user } : { authenticated: false };
+  }
+
+  async beginLogin(_ctx: AuthRequestContext, nextPath: string): Promise<AuthBeginResult> {
+    return { redirectTo: `/auth/callback?next=${encodeURIComponent(nextPath)}` };
+  }
+
+  async handleCallback(): Promise<AuthCallbackResult> {
+    return {
+      ok: true,
+      session: {
+        user: {
+          id: "ou_login",
+          email: "alice@example.com",
+          displayName: "Alice",
+          raw: { open_id: "ou_login", en_name: "Alice En" },
+        },
+        createdAt: Date.now(),
+      },
+      redirectTo: "/",
+    };
+  }
+}
+
+describe("gateway server login user-events", () => {
+  let loginServer: Server;
+  let loginBase: string;
+  let loginWorkdir: string;
+  let events: RecordEnvelope[];
+
+  beforeEach(async () => {
+    loginWorkdir = mkdtempSync(join(tmpdir(), "ua-gw-login-"));
+    const state = join(loginWorkdir, "state");
+    const dist = join(loginWorkdir, "dist");
+    mkdirSync(join(state, ".understand-anything"), { recursive: true });
+    mkdirSync(dist, { recursive: true });
+    writeFileSync(join(dist, "index.html"), "<!doctype html>");
+
+    events = [];
+    loginServer = createGatewayServer({
+      host: "127.0.0.1",
+      port: 0,
+      stateRoot: state,
+      distDir: dist,
+      runtimeToken: TOKEN,
+      authProvider: new CallbackLoginProvider(),
+      orgPolicy: {
+        name: "login-audit",
+        async canAccessProject() {
+          return {
+            allowed: true,
+            reason: "department_exact_match",
+            authReason: "department_exact_match",
+            departmentPaths: [["Data", "Allowed"]],
+            matchedDepartmentPath: ["Data", "Allowed"],
+            targetDepartment: ["Data", "Allowed"],
+          };
+        },
+      },
+      record: {
+        name: "spy",
+        async write(record) {
+          events.push(record);
+        },
+      },
+    });
+    await new Promise<void>((done) => loginServer.listen(0, "127.0.0.1", done));
+    const addr = loginServer.address() as AddressInfo;
+    loginBase = `http://127.0.0.1:${addr.port}`;
+  });
+
+  afterEach(async () => {
+    await new Promise<void>((done) => loginServer.close(() => done()));
+    rmSync(loginWorkdir, { recursive: true, force: true });
+  });
+
+  it("records one login user-event with identity and org audit fields after callback success", async () => {
+    const res = await fetch(`${loginBase}/auth/callback?ok=1`, { redirect: "manual" });
+    expect(res.status).toBe(302);
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(events).toHaveLength(1);
+    expect(events[0]!.payload.eventType).toBe("login");
+    expect(events[0]!.payload.displayName).toBe("Alice");
+    expect(events[0]!.payload.email).toBe("alice@example.com");
+    expect(events[0]!.payload.raw).toMatchObject({ open_id: "ou_login", en_name: "Alice En" });
+    expect(events[0]!.payload.authReason).toBe("department_exact_match");
+    expect(events[0]!.payload.departmentPaths).toEqual([["Data", "Allowed"]]);
   });
 });
 

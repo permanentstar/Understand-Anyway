@@ -17,6 +17,7 @@ import type {
   AuthProvider,
   AuthSession,
   EmbeddingProvider,
+  OrgPolicyDecision,
   OrgPolicyProvider,
   RecordProvider,
 } from "@understand-anyway/plugin-api";
@@ -83,12 +84,6 @@ export function createGatewayServer(options: GatewayServerOptions): Server {
   const orgPolicy = options.orgPolicy ?? new AllowAllOrgPolicyProvider();
   const record = options.record ?? new NoopRecordProvider();
   const sessions = new SessionStore({ cookieName: options.sessionCookieName ?? "ua_session" });
-  const authGate = new AuthGate({
-    provider,
-    sessions,
-    defaultEntryPath: options.defaultEntryPath ?? "/",
-    secure: options.secureCookies,
-  });
   const log = options.log ?? (() => {});
 
   const readJsonBody = async (req: IncomingMessage): Promise<Record<string, unknown>> => {
@@ -108,6 +103,54 @@ export function createGatewayServer(options: GatewayServerOptions): Server {
     void record.write(buildUserEventPayload(session, req, input)).catch((err) => {
       log(`record write failed: ${(err as Error).message}`);
     });
+  };
+
+  const orgAuditInput = (decision: OrgPolicyDecision): Pick<
+    PortalEventInput,
+    "authReason" | "departmentPaths" | "matchedDepartmentPath" | "targetDepartment" | "extra"
+  > => {
+    const authReason = decision.authReason ?? decision.reason ?? "";
+    const extra: Record<string, unknown> = {
+      reason: decision.reason ?? authReason,
+      authReason,
+    };
+    if (decision.departmentPaths) extra.departmentPaths = decision.departmentPaths;
+    if (decision.matchedDepartmentPath) extra.matchedDepartmentPath = decision.matchedDepartmentPath;
+    if (decision.targetDepartment) extra.targetDepartment = decision.targetDepartment;
+    return {
+      authReason,
+      departmentPaths: decision.departmentPaths ?? [],
+      matchedDepartmentPath: decision.matchedDepartmentPath ?? [],
+      targetDepartment: decision.targetDepartment ?? [],
+      extra,
+    };
+  };
+
+  const authGate = new AuthGate({
+    provider,
+    sessions,
+    defaultEntryPath: options.defaultEntryPath ?? "/",
+    secure: options.secureCookies,
+    async onLoginSuccess({ req, session }) {
+      let orgDecision: OrgPolicyDecision | null = null;
+      try {
+        orgDecision = await orgPolicy.canAccessProject(session.user, "");
+      } catch (err) {
+        log(`login org policy audit failed: ${(err as Error).message}`);
+      }
+      trackEvent(session, req, {
+        eventType: "login",
+        ...(orgDecision ? orgAuditInput(orgDecision) : {}),
+      });
+    },
+  });
+
+  const isProjectPageNavigation = (req: IncomingMessage, upstreamPath: string): boolean => {
+    if ((req.method ?? "GET").toUpperCase() !== "GET") return false;
+    if (upstreamPath === "/" || upstreamPath === "/index.html") return true;
+    const accept = req.headers.accept;
+    const acceptHeader = Array.isArray(accept) ? accept.join(",") : accept ?? "";
+    return acceptHeader.toLowerCase().includes("text/html");
   };
 
   return http.createServer(async (req: IncomingMessage, res: ServerResponse) => {
@@ -142,6 +185,7 @@ export function createGatewayServer(options: GatewayServerOptions): Server {
     const projectMatch = parsePublicProjectPath(url.pathname);
     if (projectMatch) {
       const orgDecision = await orgPolicy.canAccessProject(session?.user, projectMatch.projectId);
+      const audit = orgAuditInput(orgDecision);
       if (!orgDecision.allowed) {
         trackEvent(session, req, {
           eventType: "authz_denied",
@@ -149,18 +193,32 @@ export function createGatewayServer(options: GatewayServerOptions): Server {
           targetId: projectMatch.projectId,
           targetName: projectMatch.projectId,
           targetUrl: url.pathname,
-          extra: { reason: orgDecision.reason ?? "" },
+          ...audit,
         });
         sendHtml(res, 403, orgDecision.html ?? renderDeniedPage(orgDecision.reason));
         return;
       }
-      trackEvent(session, req, {
-        eventType: "project_view",
-        targetType: "project",
-        targetId: projectMatch.projectId,
-        targetName: projectMatch.projectId,
-        targetUrl: url.pathname,
-      });
+      if (options.projectRoute) {
+        const shouldTrackProjectView = isProjectPageNavigation(req, projectMatch.upstreamPath);
+        const handled = await tryServeProjectRoute(req, res, requestPath, {
+          ...options.projectRoute,
+          embeddingProvider: options.embeddingProvider,
+          maintenanceState: maintenanceState ?? options.projectRoute.maintenanceState,
+        });
+        if (handled) {
+          if (shouldTrackProjectView && res.statusCode >= 200 && res.statusCode < 300) {
+            trackEvent(session, req, {
+              eventType: "project_view",
+              targetType: "project",
+              targetId: projectMatch.projectId,
+              targetName: projectMatch.projectId,
+              targetUrl: url.pathname,
+              ...audit,
+            });
+          }
+          return;
+        }
+      }
     }
 
     if (options.projectRoute && await tryServeProjectRoute(req, res, requestPath, {

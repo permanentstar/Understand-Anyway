@@ -9,12 +9,24 @@ interface Call {
   body: unknown;
 }
 
+interface FakeFeishuOptions {
+  sheets?: Array<{ sheetId: string; title: string }>;
+  headers?: Record<string, string[]>;
+}
+
+function sheetIdFromValuesUrl(url: URL): string {
+  const encoded = url.pathname.split("/values/")[1] || "";
+  const range = decodeURIComponent(encoded);
+  return range.split("!")[0] || "";
+}
+
 /**
- * Fake Feishu API: returns tenant token, a spreadsheet with one existing
- * worksheet ("user-event", sheetId "shtUE"), an empty header, and accepts
- * appends. Records every call for assertions.
+ * Fake Feishu API: returns tenant token, sheet metadata, configurable headers,
+ * and accepts appends. Records every call for assertions.
  */
-function fakeFeishu(calls: Call[]): FetchLike {
+function fakeFeishu(calls: Call[], options: FakeFeishuOptions = {}): FetchLike {
+  const sheets = options.sheets ?? [{ sheetId: "shtUE", title: "user-event" }];
+  const headers = options.headers ?? {};
   return async (url, init) => {
     const method = init?.method ?? "GET";
     const body = init?.body ? JSON.parse(init.body) : undefined;
@@ -25,10 +37,10 @@ function fakeFeishu(calls: Call[]): FetchLike {
       return { ok: true, async json() { return { code: 0, tenant_access_token: "t-abc", expire: 7200 }; } };
     }
     if (u.pathname.endsWith("/metainfo")) {
-      return respond({ sheets: [{ sheetId: "shtUE", title: "user-event" }] });
+      return respond({ sheets });
     }
     if (u.pathname.includes("/values/") && method === "GET") {
-      return respond({ valueRange: { values: [[]] } });
+      return respond({ valueRange: { values: [headers[sheetIdFromValuesUrl(u)] ?? []] } });
     }
     if (u.pathname.endsWith("/values") && method === "PUT") {
       return respond({});
@@ -43,7 +55,7 @@ function fakeFeishu(calls: Call[]): FetchLike {
   };
 }
 
-function provider(calls: Call[]): FeishuSheetsRecordProvider {
+function provider(calls: Call[], overrides: Partial<ConstructorParameters<typeof FeishuSheetsRecordProvider>[0]> = {}): FeishuSheetsRecordProvider {
   return new FeishuSheetsRecordProvider({
     appId: "cli_x",
     appSecret: "secret_x",
@@ -52,6 +64,7 @@ function provider(calls: Call[]): FeishuSheetsRecordProvider {
     mappings: {
       "user-event": { worksheet: "user-event", columns: ["eventType", "userId", "raw.open_id"] },
     },
+    ...overrides,
   });
 }
 
@@ -81,6 +94,183 @@ describe("FeishuSheetsRecordProvider", () => {
     expect(put).toBeDefined();
     const valueRange = (put!.body as { valueRange: { values: string[][] } }).valueRange;
     expect(valueRange.values[0]).toEqual(["eventType", "userId", "raw.open_id"]);
+  });
+
+  it("preserves an existing header and appends rows aligned to the live schema", async () => {
+    const calls: Call[] = [];
+    const p = new FeishuSheetsRecordProvider({
+      appId: "cli_x",
+      appSecret: "secret_x",
+      spreadsheetToken: "shtTOKEN",
+      fetchImpl: fakeFeishu(calls, {
+        headers: {
+          shtUE: ["timestamp", "eventType", "userId", "userName", "raw.open_id"],
+        },
+      }),
+      mappings: {
+        "user-event": { worksheet: "user-event", columns: ["eventTime", "eventType", "userId", "displayName", "raw.open_id"] },
+      },
+    });
+
+    await p.write(envelope("user-event", {
+      eventTime: "2026-07-14T12:00:00.000Z",
+      eventType: "login",
+      userId: "u1",
+      displayName: "Alice",
+      raw: { open_id: "ou_9" },
+    }));
+
+    expect(calls.some((c) => c.method === "PUT" && c.url.endsWith("/values"))).toBe(false);
+    const append = calls.find((c) => c.url.includes("/values_append"));
+    expect(append).toBeDefined();
+    const valueRange = (append!.body as { valueRange: { values: string[][]; range: string } }).valueRange;
+    expect(valueRange.range).toBe("shtUE!A:E");
+    expect(valueRange.values[0]).toEqual([
+      "2026-07-14T12:00:00.000Z",
+      "login",
+      "u1",
+      "Alice",
+      "ou_9",
+    ]);
+  });
+
+  it("supports explicit alias overrides for historical custom headers", async () => {
+    const calls: Call[] = [];
+    const p = new FeishuSheetsRecordProvider({
+      appId: "cli_x",
+      appSecret: "secret_x",
+      spreadsheetToken: "shtTOKEN",
+      fetchImpl: fakeFeishu(calls, {
+        headers: {
+          shtUE: ["actorName", "eventType"],
+        },
+      }),
+      mappings: {
+        "user-event": {
+          worksheet: "user-event",
+          columns: ["displayName", "eventType"],
+          aliases: { actorName: "displayName" },
+        },
+      },
+    });
+
+    await p.write(envelope("user-event", { displayName: "Alice", eventType: "login" }));
+
+    const append = calls.find((c) => c.url.includes("/values_append"));
+    expect(append).toBeDefined();
+    const valueRange = (append!.body as { valueRange: { values: string[][] } }).valueRange;
+    expect(valueRange.values[0]).toEqual(["Alice", "login"]);
+  });
+
+  it("maps legacy user-event headers including auth reason and department paths", async () => {
+    const calls: Call[] = [];
+    const p = new FeishuSheetsRecordProvider({
+      appId: "cli_x",
+      appSecret: "secret_x",
+      spreadsheetToken: "shtTOKEN",
+      fetchImpl: fakeFeishu(calls),
+      mappings: {
+        "user-event": {
+          worksheet: "user-event",
+          columns: [
+            "eventId",
+            "eventTime",
+            "eventType",
+            "sessionId",
+            "userName",
+            "userEnName",
+            "openId",
+            "email",
+            "authReason",
+            "departmentPaths",
+            "sourceIp",
+            "userAgent",
+            "targetType",
+            "targetId",
+            "targetName",
+            "targetUrl",
+            "extra",
+          ],
+        },
+      },
+    });
+
+    await p.write(envelope("user-event", {
+      eventId: "evt-1",
+      eventTime: "2026-07-14T12:00:00.000Z",
+      eventType: "authz_denied",
+      displayName: "苏恒",
+      email: "suheng.cloud@bytedance.com",
+      sourceIp: "10.0.0.1",
+      userAgent: "Chrome",
+      targetType: "project",
+      targetId: "deer-flow",
+      targetName: "deer-flow",
+      targetUrl: "/project/deer-flow/",
+      extra: { reason: "department_scope_not_authorized" },
+      raw: {
+        open_id: "ou_1",
+        en_name: "Heng Su",
+        departmentPaths: [["Data", "数据平台"], ["Data", "数据平台", "计算平台"]],
+      },
+    }));
+
+    const append = calls.find((c) => c.url.includes("/values_append"));
+    expect(append).toBeDefined();
+    const valueRange = (append!.body as { valueRange: { values: string[][] } }).valueRange;
+    expect(valueRange.values[0]).toEqual([
+      "evt-1",
+      "2026-07-14T12:00:00.000Z",
+      "authz_denied",
+      "",
+      "苏恒",
+      "Heng Su",
+      "ou_1",
+      "suheng.cloud@bytedance.com",
+      "department_scope_not_authorized",
+      "Data > 数据平台 | Data > 数据平台 > 计算平台",
+      "10.0.0.1",
+      "Chrome",
+      "project",
+      "deer-flow",
+      "deer-flow",
+      "/project/deer-flow/",
+      "{\"reason\":\"department_scope_not_authorized\"}",
+    ]);
+  });
+
+  it("maps gateway top-level org audit fields into legacy user-event headers", async () => {
+    const calls: Call[] = [];
+    const p = new FeishuSheetsRecordProvider({
+      appId: "cli_x",
+      appSecret: "secret_x",
+      spreadsheetToken: "shtTOKEN",
+      fetchImpl: fakeFeishu(calls),
+      mappings: {
+        "user-event": {
+          worksheet: "user-event",
+          columns: ["eventType", "authReason", "departmentPaths", "extra"],
+        },
+      },
+    });
+
+    await p.write(envelope("user-event", {
+      eventType: "project_view",
+      authReason: "department_exact_match",
+      departmentPaths: [["Data", "数据平台", "计算平台"]],
+      extra: { reason: "legacy_reason" },
+      raw: { open_id: "ou_1" },
+    }));
+
+    const append = calls.find((c) => c.url.includes("/values_append"));
+    expect(append).toBeDefined();
+    const valueRange = (append!.body as { valueRange: { values: string[][] } }).valueRange;
+    expect(valueRange.values[0]).toEqual([
+      "project_view",
+      "department_exact_match",
+      "Data > 数据平台 > 计算平台",
+      "{\"reason\":\"legacy_reason\"}",
+    ]);
   });
 
   it("skips kinds without a mapping (no API calls)", async () => {
@@ -117,6 +307,31 @@ describe("FeishuSheetsRecordProvider", () => {
     expect(create).toBeDefined();
     const append = calls.find((c) => c.url.includes("/values_append"));
     expect((append!.body as { valueRange: { values: string[][]; range: string } }).valueRange.range).toBe("shtNEW!A:A");
+  });
+
+  it("refuses sparse historical headers instead of rewriting them", async () => {
+    const messages: string[] = [];
+    const calls: Call[] = [];
+    const p = new FeishuSheetsRecordProvider({
+      appId: "cli_x",
+      appSecret: "secret_x",
+      spreadsheetToken: "shtTOKEN",
+      fetchImpl: fakeFeishu(calls, {
+        headers: {
+          shtUE: ["eventType", "", "userId"],
+        },
+      }),
+      mappings: {
+        "user-event": { worksheet: "user-event", columns: ["eventType", "userId"] },
+      },
+      log: (message) => messages.push(message),
+    });
+
+    await p.write(envelope("user-event", { eventType: "login", userId: "u1" }));
+
+    expect(calls.some((c) => c.method === "PUT" && c.url.endsWith("/values"))).toBe(false);
+    expect(calls.some((c) => c.url.includes("/values_append"))).toBe(false);
+    expect(messages.some((message) => message.includes("invalid worksheet header"))).toBe(true);
   });
 });
 

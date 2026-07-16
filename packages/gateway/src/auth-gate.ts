@@ -29,6 +29,15 @@ export interface AuthGateOptions {
   defaultEntryPath?: string;
   /** Seconds before expiry within which a session is proactively refreshed. */
   secure?: boolean;
+  onLoginSuccess?: (event: AuthGateLoginSuccessEvent) => void | Promise<void>;
+}
+
+export interface AuthGateLoginSuccessEvent {
+  req: IncomingMessage;
+  url: URL;
+  session: AuthSession;
+  token: string;
+  redirectTo: string;
 }
 
 export interface AuthGateDecision {
@@ -45,12 +54,14 @@ export class AuthGate {
   private readonly sessions: SessionStore;
   private readonly defaultEntryPath: string;
   private readonly secure: boolean;
+  private readonly onLoginSuccess?: (event: AuthGateLoginSuccessEvent) => void | Promise<void>;
 
   constructor(options: AuthGateOptions) {
     this.provider = options.provider;
     this.sessions = options.sessions;
     this.defaultEntryPath = options.defaultEntryPath ?? "/";
     this.secure = Boolean(options.secure);
+    this.onLoginSuccess = options.onLoginSuccess;
   }
 
   private get enabled(): boolean {
@@ -130,7 +141,15 @@ export class AuthGate {
         return { handled: true };
       }
       const newToken = this.sessions.create(result.session);
-      this.redirect(res, result.redirectTo ?? this.defaultEntryPath, {
+      const redirectTo = result.redirectTo ?? this.defaultEntryPath;
+      await this.onLoginSuccess?.({
+        req,
+        url,
+        session: result.session,
+        token: newToken,
+        redirectTo,
+      });
+      this.redirect(res, redirectTo, {
         "Set-Cookie": this.sessionCookie(newToken),
       });
       return { handled: true };
