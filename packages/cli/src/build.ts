@@ -106,7 +106,7 @@ export async function runBuild(args: BuildArgs, options: RunBuildOptions = {}): 
   const ctx = resolveCtx(args.projectId);
   const projectRoot = ctx.repoPath;
   const stateRoot = ctx.stateRoot;
-  const scanRoot = resolveScanRoot(projectRoot, stateRoot);
+  const scanRoot = resolveScanRoot(projectRoot, stateRoot) ?? projectRoot;
 
   assertDirectory(projectRoot, "repo");
   const effectiveConfigPath = args.config ?? ctx.deployConfigPath;
@@ -148,6 +148,7 @@ export async function runBuild(args: BuildArgs, options: RunBuildOptions = {}): 
     skillDir: upstream.skillDir,
     projectRoot,
     scanRoot,
+    analysisRoot: stateRoot,
     stateRoot,
     mode: resolved.mode,
     includePaths: resolved.includePaths,

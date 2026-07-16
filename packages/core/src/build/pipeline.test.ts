@@ -616,6 +616,54 @@ describe("runFullBuild (orchestration)", () => {
     expect(result.analyzedFiles).toBe(1);
   });
 
+  it("resume reads checkpoint from analysisRoot but source from scanRoot", async () => {
+    const { core } = makeCore();
+    const fs: Record<string, string> = {
+      "/state/.understand-anything/intermediate/scan-result.json": JSON.stringify({ files: [], totalFiles: 0 }),
+      "/state/.understand-anything/knowledge-graph.json": JSON.stringify({
+        nodes: [{ id: "old", filePath: "src/b.ts" }],
+        edges: [],
+        project: { gitCommitHash: "base123" },
+      }),
+      "/state/.understand-anything/meta.json": JSON.stringify({ gitCommitHash: "base123" }),
+      "/repo/src/a.ts": "source from repo",
+    };
+    const writes: Record<string, string> = {};
+    const reads: string[] = [];
+
+    await runResumeBuild(
+      { core, skillDir: "/skill", projectRoot: "/repo", analysisRoot: "/state", scanRoot: "/repo", stateRoot: "/state", log: () => {} } as any,
+      {
+        existsSync: (p: string) => p in fs || p in writes,
+        readFileSync: (p: string) => {
+          reads.push(p);
+          const c = writes[p] ?? fs[p];
+          if (c === undefined) throw new Error(`missing ${p}`);
+          return c;
+        },
+        writeFileSync: (p: string, d: string) => { writes[p] = d; },
+        ensureDirs: () => {},
+        execFileSync: vi.fn() as any,
+        resolveGitHash: () => "head999",
+        resolveGitDirty: () => false,
+        createRegistry: async () => ({
+          resolveImports: () => [],
+          analyzeFile: () => ({ functions: [], classes: [] }),
+          extractCallGraph: () => [],
+        }),
+        validateCheckpoint: () => ({
+          manifest: { buildKind: "incremental", baseGraphCommit: "base123", changedFiles: ["src/a.ts"] } as any,
+          batches: [{ batchIndex: 1, files: [{ path: "src/a.ts", fileCategory: "code", language: "ts" }] }],
+          batchIndexes: [1],
+        }),
+      } as any,
+    );
+
+    // Source must be read from the repo (scanRoot), never the state tree.
+    expect(reads).toContain("/repo/src/a.ts");
+    expect(reads).not.toContain("/state/src/a.ts");
+  });
+
   it("incremental fails when existing graph is missing", async () => {
     const { core } = makeCore();
     const runFull = vi.fn();
@@ -848,6 +896,128 @@ describe("runFullBuild (orchestration)", () => {
     expect(saved.graph.g.nodes.map((node: any) => node.id)).toEqual(["src/kept.ts"]);
     expect(saved.graph.g.edges).toEqual([]);
     expect(saved.meta.m.gitCommitHash).toBe("head456");
+  });
+
+  it("incremental reads checkpoint/graph from stateRoot and git changes from projectRoot", async () => {
+    const { core, saved } = makeCore();
+    const getChangedFiles = vi.fn().mockReturnValue(["src/a.ts"]);
+    (core as any).getChangedFiles = getChangedFiles;
+    // stateRoot (where graph + intermediate live) is distinct from the repo.
+    const fs: Record<string, string> = {
+      "/state/.understand-anything/knowledge-graph.json": JSON.stringify({
+        project: { gitCommitHash: "base123" },
+        nodes: [{ id: "src/a.ts", type: "file", filePath: "src/a.ts" }],
+        edges: [],
+      }),
+      "/state/.understand-anything/intermediate/scan-result.json": JSON.stringify({
+        files: [{ path: "src/a.ts" }],
+        totalFiles: 1,
+      }),
+      "/state/.understand-anything/intermediate/batches.json": JSON.stringify({
+        batches: [{ batchIndex: 1, files: [{ path: "src/a.ts" }] }],
+      }),
+      "/state/.understand-anything/intermediate/phase2-input-manifest.json": JSON.stringify({
+        batchesSha256: "skip",
+        batchCount: 1,
+      }),
+      "/state/.understand-anything/intermediate/batch-1.json": JSON.stringify({
+        nodes: [{ id: "src/a.ts", type: "file", filePath: "src/a.ts" }],
+        edges: [],
+      }),
+      "/repo/src/a.ts": "source",
+    };
+    const writes: Record<string, string> = {};
+
+    const result = await runBuildMode(
+      { core, skillDir: "/skill", projectRoot: "/repo", stateRoot: "/state", mode: "incremental", log: () => {} },
+      {
+        existsSync: (p: string) => p in fs || p in writes,
+        readFileSync: (p: string) => {
+          const c = writes[p] ?? fs[p];
+          if (c === undefined) throw new Error(`missing ${p}`);
+          return c;
+        },
+        writeFileSync: (p: string, d: string) => { writes[p] = d; },
+        execFileSync: vi.fn() as any,
+        resolveGitHash: () => "head789",
+        createRegistry: async () => ({
+          resolveImports: () => [],
+          analyzeFile: () => ({ functions: [], classes: [] }),
+          extractCallGraph: () => [],
+        }),
+        validateCheckpoint: () => ({
+          manifest: {} as any,
+          batches: [{ batchIndex: 1, files: [{ path: "src/a.ts" }] }],
+          batchIndexes: [1],
+        }),
+      } as any,
+    );
+
+    // git diff basis comes from the repo, not the state root.
+    expect(getChangedFiles).toHaveBeenCalledWith("/repo", "base123");
+    expect(result.updatedFiles).toEqual(["src/a.ts"]);
+    expect(saved.meta.m.gitCommitHash).toBe("head789");
+    // Intermediate manifest is (re)written under the state root, never the repo.
+    expect(Object.keys(writes).some((p) => p.startsWith("/state/.understand-anything/intermediate/"))).toBe(true);
+    expect(Object.keys(writes).some((p) => p.startsWith("/repo/.understand-anything/"))).toBe(false);
+  });
+
+  it("incremental re-analyzes changed files from scanRoot, not the state tree", async () => {
+    const { core } = makeCore();
+    const getChangedFiles = vi.fn().mockReturnValue(["src/a.ts"]);
+    (core as any).getChangedFiles = getChangedFiles;
+    // No pre-seeded batch-1.json: the source must actually be read to produce it.
+    const fs: Record<string, string> = {
+      "/state/.understand-anything/knowledge-graph.json": JSON.stringify({
+        project: { gitCommitHash: "base123" },
+        nodes: [{ id: "src/a.ts", type: "file", filePath: "src/a.ts" }],
+        edges: [],
+      }),
+      "/state/.understand-anything/intermediate/scan-result.json": JSON.stringify({
+        files: [{ path: "src/a.ts", fileCategory: "code", language: "ts" }],
+        totalFiles: 1,
+      }),
+      "/state/.understand-anything/intermediate/batches.json": JSON.stringify({
+        batches: [{ batchIndex: 1, files: [{ path: "src/a.ts", fileCategory: "code", language: "ts" }] }],
+      }),
+      "/state/.understand-anything/intermediate/phase2-input-manifest.json": JSON.stringify({
+        batchesSha256: "skip",
+        batchCount: 1,
+      }),
+      "/repo/src/a.ts": "source from repo",
+    };
+    const writes: Record<string, string> = {};
+    const reads: string[] = [];
+
+    await runBuildMode(
+      { core, skillDir: "/skill", projectRoot: "/repo", stateRoot: "/state", mode: "incremental", log: () => {} },
+      {
+        existsSync: (p: string) => p in fs || p in writes,
+        readFileSync: (p: string) => {
+          reads.push(p);
+          const c = writes[p] ?? fs[p];
+          if (c === undefined) throw new Error(`missing ${p}`);
+          return c;
+        },
+        writeFileSync: (p: string, d: string) => { writes[p] = d; },
+        execFileSync: vi.fn() as any,
+        resolveGitHash: () => "head789",
+        createRegistry: async () => ({
+          resolveImports: () => [],
+          analyzeFile: () => ({ functions: [], classes: [] }),
+          extractCallGraph: () => [],
+        }),
+        validateCheckpoint: () => ({
+          manifest: {} as any,
+          batches: [{ batchIndex: 1, files: [{ path: "src/a.ts", fileCategory: "code", language: "ts" }] }],
+          batchIndexes: [1],
+        }),
+      } as any,
+    );
+
+    // Changed-file source is read from the repo (scanRoot), never the state tree.
+    expect(reads).toContain("/repo/src/a.ts");
+    expect(reads).not.toContain("/state/src/a.ts");
   });
 
   it("backfill auto-detects missing code files in an isolated workspace", async () => {

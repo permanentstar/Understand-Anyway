@@ -143,6 +143,64 @@ describe("runBuild", () => {
     expect(runBuildPipeline.mock.calls[0]![0].scanRoot).toBe(resolve(stateDir, "source-mirror", "v1"));
   });
 
+  it("routes intermediate to stateRoot and scans the repo when no source mirror exists", async () => {
+    const stateDir = resolve(repo, "state");
+    mkdirSync(stateDir, { recursive: true });
+
+    const bootstrap = vi.fn().mockResolvedValue({ pluginRoot: "/p", skillDir: "/p/s", core: {} });
+    const runBuildPipeline = vi.fn().mockResolvedValue({
+      graph: { nodes: [], edges: [] },
+      gitHash: "",
+      analyzedFiles: 0,
+      paths: { stateRoot: stateDir },
+    });
+
+    await runBuild(baseArgs(), {
+      log: () => {},
+      deps: {
+        bootstrap,
+        runBuild: runBuildPipeline,
+        loadConfig: () => ({}),
+        resolveProjectContext: () => fakeCtx(repo, stateDir),
+      },
+    });
+
+    const call = runBuildPipeline.mock.calls[0]![0];
+    // B semantics: intermediate follows the state root, source reads follow the repo.
+    expect(call.analysisRoot).toBe(stateDir);
+    expect(call.scanRoot).toBe(repo);
+    expect(call.stateRoot).toBe(stateDir);
+  });
+
+  it("routes intermediate to stateRoot while scanning the source mirror", async () => {
+    const stateDir = resolve(repo, "state");
+    mkdirSync(resolve(stateDir, "source-mirror", "v1"), { recursive: true });
+    writeFileSync(resolve(stateDir, "versioned-state.json"), JSON.stringify({ currentVersion: "v1" }));
+
+    const bootstrap = vi.fn().mockResolvedValue({ pluginRoot: "/p", skillDir: "/p/s", core: {} });
+    const runBuildPipeline = vi.fn().mockResolvedValue({
+      graph: { nodes: [], edges: [] },
+      gitHash: "",
+      analyzedFiles: 0,
+      paths: { stateRoot: stateDir },
+    });
+
+    await runBuild(baseArgs(), {
+      log: () => {},
+      deps: {
+        bootstrap,
+        runBuild: runBuildPipeline,
+        loadConfig: () => ({}),
+        resolveProjectContext: () => fakeCtx(repo, stateDir),
+      },
+    });
+
+    const call = runBuildPipeline.mock.calls[0]![0];
+    expect(call.analysisRoot).toBe(stateDir);
+    expect(call.scanRoot).toBe(resolve(stateDir, "source-mirror", "v1"));
+    expect(call.stateRoot).toBe(stateDir);
+  });
+
   it("fails fast when the repo directory does not exist", async () => {
     const bootstrap = vi.fn();
     await expect(

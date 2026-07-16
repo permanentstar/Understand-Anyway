@@ -86,11 +86,11 @@ export interface RunFullBuildOptions {
   skillDir: string;
   /** Repo root (for git metadata + import resolution). */
   projectRoot: string;
-  /** Root that files are scanned/analyzed under (defaults to projectRoot). */
+  /** Root that intermediate/checkpoint artifacts are written under (defaults to stateRoot). */
   analysisRoot?: string;
-  /** Optional source root used by scan/import-map/phase-2 reads when distinct from analysisRoot. */
+  /** Source root scanned/analyzed for code (defaults to projectRoot). */
   scanRoot?: string;
-  /** Where `.understand-anything/` state is written (defaults to projectRoot). */
+  /** Where `.understand-anything/` graph/meta/config state is written (defaults to projectRoot). */
   stateRoot?: string;
   outputLanguage?: string;
   excludeTests?: boolean;
@@ -331,9 +331,12 @@ export async function runFullBuild(
   const llmAttemptEntries: LlmAttemptJournalEntry[] = [];
 
   const projectRoot = resolve(options.projectRoot);
-  const analysisRoot = resolve(options.analysisRoot ?? projectRoot);
-  const scanRoot = resolve(options.scanRoot ?? analysisRoot);
   const stateRoot = resolve(options.stateRoot ?? projectRoot);
+  // Intermediate/checkpoint artifacts follow the state tree; source scanning
+  // follows the repo (or an explicit source mirror). This keeps the source
+  // repo clean while all build products land under the state root.
+  const analysisRoot = resolve(options.analysisRoot ?? stateRoot);
+  const scanRoot = resolve(options.scanRoot ?? projectRoot);
   const statePaths = resolveBuildPaths(stateRoot);
   const outputLanguage = options.outputLanguage ?? "en";
   const excludeTests = options.excludeTests ?? false;
@@ -622,8 +625,9 @@ export async function runResumeBuild(
   const validateCheckpoint = deps.validateCheckpoint ?? validatePhase2Checkpoint;
 
   const projectRoot = resolve(options.projectRoot);
-  const analysisRoot = resolve(options.analysisRoot ?? projectRoot);
   const stateRoot = resolve(options.stateRoot ?? projectRoot);
+  const analysisRoot = resolve(options.analysisRoot ?? stateRoot);
+  const scanRoot = resolve(options.scanRoot ?? projectRoot);
   const statePaths = resolveBuildPaths(stateRoot);
   const outputLanguage = options.outputLanguage ?? "en";
   const excludeTests = options.excludeTests ?? false;
@@ -648,7 +652,7 @@ export async function runResumeBuild(
   log("resume phase 2/4 analyze batches");
   const registry = await buildRegistry(core);
   writeBatchGraphFiles(
-    { core, registry, analysisRoot, intermediateDir: paths.intermediateDir, batches: checkpoint.batches, outputLanguage, projectName, gitHash, log },
+    { core, registry, analysisRoot: scanRoot, intermediateDir: paths.intermediateDir, batches: checkpoint.batches, outputLanguage, projectName, gitHash, log },
     { readFileSync: read, writeFileSync: write },
   );
   if (buildKind === "incremental" || buildKind === "backfill") {
@@ -725,6 +729,7 @@ export async function runPartialBuildUpdate(
 
   const projectRoot = resolve(options.projectRoot);
   const stateRoot = resolve(options.stateRoot ?? projectRoot);
+  const scanRoot = resolve(options.scanRoot ?? projectRoot);
   const outputLanguage = options.outputLanguage ?? "en";
   const excludeTests = options.excludeTests ?? false;
   const projectName = basename(projectRoot);
@@ -848,7 +853,7 @@ export async function runPartialBuildUpdate(
     }
   }
 
-  const analysisRoot = resolve(options.analysisRoot ?? projectRoot);
+  const analysisRoot = resolve(options.analysisRoot ?? stateRoot);
   const paths = resolveBuildPaths(analysisRoot);
 
   const checkpoint = validateCheckpoint(paths, { existsSync, readFileSync: (p) => read(p, "utf8") });
@@ -887,7 +892,7 @@ export async function runPartialBuildUpdate(
   }, { readFileSync: (p) => read(p, "utf8"), currentGitDirty: deps.resolveGitDirty }, selectedBatches);
   write(paths.phase2ManifestPath, JSON.stringify(manifest, null, 2), "utf8");
   writeBatchGraphFiles(
-    { core, registry, analysisRoot, intermediateDir: paths.intermediateDir, batches: selectedBatches, outputLanguage, projectName, gitHash, log },
+    { core, registry, analysisRoot: scanRoot, intermediateDir: paths.intermediateDir, batches: selectedBatches, outputLanguage, projectName, gitHash, log },
     { readFileSync: read, writeFileSync: write },
   );
 
