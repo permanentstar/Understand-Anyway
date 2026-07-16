@@ -1,9 +1,129 @@
+packages/provider-feishu-auth/src/feishu-auth-provider.ts
+  s_4dc68bee55133e::t_b15192f791a3ad 82,85-89 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a55fdd0f72d6ccd416de393","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":82},{"Range":[85,89]}]}]}
+packages/cli/src/gateway/index.ts
+  s_4dc68bee55133e::t_fb6a9f7e2738ff 136-140,143,152-155 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a55fdfaf72d6ccd416de39c","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[136,140]},{"Single":143},{"Range":[152,155]}]}]}
+  s_4dc68bee55133e::t_31ed2fbbe6fe22 156-158
 ---
 {
   "schema_version": "authorship/3.0.0",
   "git_ai_version": "1.6.10",
   "base_commit_sha": "a768998eb90e5047ddab09fa67510df7d6d72b19",
   "prompts": {},
-  "attestation_metadata": {},
-  "remote_transcripts": {}
+  "sessions": {
+    "s_4dc68bee55133e": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a50ab28caac80d00b3e8217",
+        "model": "openrouter-2o__max"
+      },
+      "human_author": "permanentstar <permanent.star@gmail.com>"
+    }
+  },
+  "attestation_metadata": {
+    "packages/cli/src/gateway/index.ts": [
+      {
+        "hash": "s_4dc68bee55133e::t_fb6a9f7e2738ff",
+        "line_ranges": [
+          {
+            "Range": [
+              136,
+              140
+            ]
+          },
+          {
+            "Single": 143
+          },
+          {
+            "Range": [
+              152,
+              155
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a55fdfaf72d6ccd416de39c",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  136,
+                  140
+                ]
+              },
+              {
+                "Single": 143
+              },
+              {
+                "Range": [
+                  152,
+                  155
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "packages/provider-feishu-auth/src/feishu-auth-provider.ts": [
+      {
+        "hash": "s_4dc68bee55133e::t_b15192f791a3ad",
+        "line_ranges": [
+          {
+            "Single": 82
+          },
+          {
+            "Range": [
+              85,
+              89
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a55fdd0f72d6ccd416de393",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 82
+              },
+              {
+                "Range": [
+                  85,
+                  89
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "s_4dc68bee55133e": {
+      "tool": "trae",
+      "conversation_id": "6a50ab28caac80d00b3e8217",
+      "session_id": "6a50ab28caac80d00b3e8217",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_4dc68bee55133e::t_b15192f791a3ad": {
+      "tool": "trae",
+      "conversation_id": "6a50ab28caac80d00b3e8217",
+      "session_id": "6a50ab28caac80d00b3e8217",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_4dc68bee55133e::t_fb6a9f7e2738ff": {
+      "tool": "trae",
+      "conversation_id": "6a50ab28caac80d00b3e8217",
+      "session_id": "6a50ab28caac80d00b3e8217",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
 }
