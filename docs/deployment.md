@@ -195,7 +195,7 @@ review 输出契约：
 
 ```bash
 understand-anyway notify nightly \
-  --report ~/understand-projects/gateway/operations/nightly-latest.json \
+  --report "$UA_PROJECTS_ROOT/gateway/operations/nightly-latest.json" \
   --notify-provider "<your-notify-provider-package>"
 ```
 

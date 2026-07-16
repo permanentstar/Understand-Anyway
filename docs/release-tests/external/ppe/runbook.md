@@ -72,11 +72,11 @@ export UA_RELEASE_GATE_EXTERNAL_PPE_OSS_RELEASE_CMD='node scripts/release-gate-p
 
 `ppe-oss-release` 验证标准 OSS 安装形态，额外行为：
 
-- 控制端本机 `pnpm -r build` + `pnpm pack` 10 个包（`pnpm pack` 会把
+- 控制端本机 `pnpm -r build` + `pnpm pack` 所有 OSS workspace 包（`pnpm pack` 会把
   `workspace:*` 依赖解析成真实版本号；`npm pack` 不会，会导致 publish 报
   `EUNSUPPORTEDPROTOCOL`），再 `scp` 到 PPE 的 `verdaccio-tarballs/`。
 - 部署会话：PPE 本地起 Verdaccio（`setsid` 脱离 ssh channel）→ 写 scoped
-  `.npmrc` token → `npm publish` 6 个包 → `npm install @understand-anyway/cli`
+  `.npmrc` token → `npm publish` 所有包 → `npm install @understand-anyway/cli`
   → `understand-anyway init` → `understand-anyway ops daily-update`
   （build + gateway publish + dashboard，LLM 走 traex）→ 干净 `exit 0`。
 - teardown 会话（独立 ssh）：`gateway stop` + kill Verdaccio（从端口解析真实

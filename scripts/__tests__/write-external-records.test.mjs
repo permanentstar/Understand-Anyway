@@ -97,10 +97,9 @@ function check(name, cond, detail) {
   }
 }
 
-// Prod aggregate shape captured from
-// ~/understand-anyway-projects/gateway/operations/nightly-latest.json
-// on 10.37.14.13. Keep this fixture close to the real payload so any
-// upstream schema shift also breaks these tests.
+// Aggregate shape captured from a nightly-latest.json payload. Keep this
+// fixture close to the real payload so any upstream schema shift also breaks
+// these tests.
 const aggregateFixture = {
   runId: "20260714-170836",
   startedAt: "2026-07-14T17:08:36+08:00",
@@ -116,13 +115,13 @@ const aggregateFixture = {
   },
   logs: {
     result:
-      "/home/suheng.cloud/understand-anyway-projects/gateway/operations/nightly-runs/20260714-170836/result.json",
+      "/tmp/ua-projects/gateway/operations/nightly-runs/20260714-170836/result.json",
   },
   projects: [
     {
-      projectName: "bytedcli",
-      repoPath: "/home/suheng.cloud/project/bytedcli",
-      stateDir: "/home/suheng.cloud/understand-anyway-projects/projects/bytedcli",
+      projectName: "sample-service",
+      repoPath: "/tmp/repos/sample-service",
+      stateDir: "/tmp/ua-projects/projects/sample-service",
       commit: "5c30301122f15e41a1034b63094e1ac0cc8a519d",
       runId: "20260714-170836",
       startedAt: "2026-07-14T17:08:36+08:00",

@@ -22,11 +22,7 @@ fi
 __ua_ppe_env_script_dir="$(cd -- "$(dirname -- "$__ua_ppe_env_source_path")" && pwd -P)"
 __ua_ppe_env_repo_root="$(cd -- "$__ua_ppe_env_script_dir/.." && pwd -P)"
 
-: "${UA_RELEASE_GATE_PPE_HOST:=10.37.226.132}"
-: "${UA_RELEASE_GATE_PPE_USER:=suheng.cloud}"
-: "${UA_RELEASE_GATE_PPE_ROOT:=/data00/home/suheng.cloud/understand-anyway-ppe}"
-: "${UA_RELEASE_GATE_PPE_PLUGIN_ROOT:=/data00/home/suheng.cloud/.local/share/understand-anything-plugin/understand-anything-plugin}"
-: "${UA_RELEASE_GATE_PPE_TRAEX_BIN:=/home/${UA_RELEASE_GATE_PPE_USER}/.local/bin/traex}"
+: "${UA_RELEASE_GATE_PPE_TRAEX_BIN:=traex}"
 : "${UA_RELEASE_GATE_PPE_REGISTRY:=http://127.0.0.1:4873}"
 
 __ua_ppe_env_find_repo_base() {
@@ -52,7 +48,7 @@ __ua_ppe_env_find_latest_npm_dir() {
   printf '%s\n' "$latest"
 }
 
-if [[ -z "${UA_RELEASE_GATE_PPE_REPO_DIR:-}" || -z "${UA_RELEASE_GATE_PPE_REPO_PROJECTS_ROOT:-}" ]]; then
+if [[ -n "${UA_RELEASE_GATE_PPE_ROOT:-}" && ( -z "${UA_RELEASE_GATE_PPE_REPO_DIR:-}" || -z "${UA_RELEASE_GATE_PPE_REPO_PROJECTS_ROOT:-}" ) ]]; then
   __ua_ppe_env_repo_base="$(__ua_ppe_env_find_repo_base "$UA_RELEASE_GATE_PPE_ROOT" 2>/dev/null || true)"
   if [[ -n "$__ua_ppe_env_repo_base" ]]; then
     : "${UA_RELEASE_GATE_PPE_REPO_DIR:=$__ua_ppe_env_repo_base/repo}"
@@ -60,7 +56,7 @@ if [[ -z "${UA_RELEASE_GATE_PPE_REPO_DIR:-}" || -z "${UA_RELEASE_GATE_PPE_REPO_P
   fi
 fi
 
-if [[ -z "${UA_RELEASE_GATE_PPE_NPM_DIR:-}" ]]; then
+if [[ -n "${UA_RELEASE_GATE_PPE_ROOT:-}" && -z "${UA_RELEASE_GATE_PPE_NPM_DIR:-}" ]]; then
   __ua_ppe_env_npm_dir="$(__ua_ppe_env_find_latest_npm_dir "$UA_RELEASE_GATE_PPE_ROOT" 2>/dev/null || true)"
   if [[ -n "$__ua_ppe_env_npm_dir" ]]; then
     UA_RELEASE_GATE_PPE_NPM_DIR="$__ua_ppe_env_npm_dir"

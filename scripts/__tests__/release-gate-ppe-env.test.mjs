@@ -70,18 +70,20 @@ try {
   writeFileSync(resolve(npmB, "install", "package.json"), "{}\n", "utf8");
 
   const env = sourceEnv({
+    UA_RELEASE_GATE_PPE_HOST: "ppe.example.com",
+    UA_RELEASE_GATE_PPE_USER: "ppe-user",
     UA_RELEASE_GATE_PPE_ROOT: tempRoot,
     UA_RELEASE_GATE_PPE_PLUGIN_ROOT: "/tmp/plugin-root",
   });
 
-  assert.equal(env.UA_RELEASE_GATE_PPE_HOST, "10.37.226.132");
-  assert.equal(env.UA_RELEASE_GATE_PPE_USER, "suheng.cloud");
+  assert.equal(env.UA_RELEASE_GATE_PPE_HOST, "ppe.example.com");
+  assert.equal(env.UA_RELEASE_GATE_PPE_USER, "ppe-user");
   assert.equal(env.UA_RELEASE_GATE_PPE_ROOT, tempRoot);
   assert.equal(env.UA_RELEASE_GATE_PPE_PLUGIN_ROOT, "/tmp/plugin-root");
   assert.equal(env.UA_RELEASE_GATE_PPE_REPO_DIR, resolve(repoBase, "repo"));
   assert.equal(env.UA_RELEASE_GATE_PPE_REPO_PROJECTS_ROOT, resolve(repoBase, "projects-root"));
   assert.equal(env.UA_RELEASE_GATE_PPE_NPM_DIR, npmB);
-  assert.match(env.UA_RELEASE_GATE_PPE_TRAEX_BIN, /\/home\/suheng\.cloud\/\.local\/bin\/traex$/);
+  assert.equal(env.UA_RELEASE_GATE_PPE_TRAEX_BIN, "traex");
   assert.equal(env.UA_RELEASE_GATE_PPE_REGISTRY, "http://127.0.0.1:4873");
   assert.match(env.UA_RELEASE_GATE_EXTERNAL_PPE_REPO_CMD, /release-gate-ppe\.mjs' --case ppe-repo$/);
   assert.match(env.UA_RELEASE_GATE_EXTERNAL_PPE_NPM_INSTALLED_CMD, /release-gate-ppe\.mjs' --case ppe-npm-installed$/);
@@ -101,6 +103,8 @@ try {
   assert.equal(overridden.UA_RELEASE_GATE_PPE_TRAEX_BIN, "/tmp/traex");
 
   const zshEnv = sourceEnv({
+    UA_RELEASE_GATE_PPE_HOST: "ppe.example.com",
+    UA_RELEASE_GATE_PPE_USER: "ppe-user",
     UA_RELEASE_GATE_PPE_ROOT: tempRoot,
     UA_RELEASE_GATE_PPE_PLUGIN_ROOT: "/tmp/plugin-root",
   }, "zsh");

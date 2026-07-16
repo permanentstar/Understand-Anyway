@@ -38,7 +38,7 @@ function usage() {
     "  UA_RELEASE_GATE_PPE_REPO_DIR               default: <root>/0d7ada6/repo",
     "  UA_RELEASE_GATE_PPE_REPO_PROJECTS_ROOT     default: <root>/0d7ada6/projects-root",
     "  UA_RELEASE_GATE_PPE_NPM_DIR                default: <root>/npm-installed-20260702-165612",
-    "  UA_RELEASE_GATE_PPE_TRAEX_BIN              default: /home/<user>/.local/bin/traex",
+    "  UA_RELEASE_GATE_PPE_TRAEX_BIN              default: traex",
     "  UA_RELEASE_GATE_PPE_REGISTRY               default: http://127.0.0.1:4873 (ppe-oss-release)",
     "",
   ].join("\n");
@@ -92,7 +92,7 @@ function buildEnv() {
   const npmOrchRepo = resolve(npmBase, "orch-repo");
   const npmInstallDir = resolve(npmBase, "install");
   const npmProjectsRoot = resolve(npmBase, "projects-root");
-  const traexBin = process.env.UA_RELEASE_GATE_PPE_TRAEX_BIN || `/home/${user}/.local/bin/traex`;
+  const traexBin = process.env.UA_RELEASE_GATE_PPE_TRAEX_BIN || "traex";
   const registry = process.env.UA_RELEASE_GATE_PPE_REGISTRY || "http://127.0.0.1:4873";
   const registryListen = registry.replace(/^https?:\/\//, "");
   const verdaccioStorage = process.env.UA_RELEASE_GATE_PPE_VERDACCIO_STORAGE || resolve(root, "verdaccio-storage");
@@ -238,7 +238,7 @@ function buildRealLlmShimCommand(env, workRoot) {
 }
 
 // Standard OSS deploy: within a single ssh session, run a self-contained
-// Verdaccio lifecycle (start -> publish the six tarballs -> install the CLI
+// Verdaccio lifecycle (start -> publish the staged tarballs -> install the CLI
 // from that registry -> register a synthetic project -> run the bundled
 // `understand-anyway ops daily-update` with traex LLM -> stop). Verdaccio is a
 // child of this command's shell and is killed on EXIT via trap, so nothing is
@@ -328,7 +328,7 @@ function buildOssReleaseCommand(env, workRoot) {
   const encodedGreet = Buffer.from(greetFile, "utf8").toString("base64");
   const encodedIndex = Buffer.from(indexFile, "utf8").toString("base64");
 
-  // Ordered publish of the six tarballs already staged in env.tarballDir.
+  // Ordered publish of the tarballs already staged in env.tarballDir.
   // Quote only the directory so the remote shell still expands the glob.
   const publishSegments = PKG_DIRS.map(
     (pkg) =>

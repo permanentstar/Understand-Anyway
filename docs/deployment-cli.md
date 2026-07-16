@@ -28,6 +28,7 @@ deploy:
 
 gateway:
   retain: 3                  # gateway publish 时保留多少非保护 release
+  # portalAssetsSubdir: "overlay"  # 可选；从 gateway/portal-assets/<subdir>/ 读取品牌资源
 
 llmProfiles:
   traex:
@@ -48,13 +49,24 @@ providers:
   portalAssets:{ package: "...", config: {...} }
 
 record:
-  providers: ["local"]       # "[]" 关闭所有外部 record
+  providers: ["local"]       # 加 "feishu-sheets" 可同步到在线表格；"[]" 关闭所有外部 record
   config:
     feishu-sheets:
       spreadsheetToken: "{{ RECORD_SHEET_TOKEN }}"
-      worksheets:
-        nightly: "nightly-update"
-        project: "project-update"
+      mappings:
+        user-event:
+          worksheet: "user-event"
+          columns: ["eventId", "eventTime", "eventType", "sessionId", "userName",
+                    "userEnName", "openId", "email", "authReason", "departmentPaths",
+                    "sourceIp", "userAgent", "targetType", "targetId", "targetName",
+                    "targetUrl", "extra"]
+        nightly-update:
+          worksheet: "nightly-update"
+          columns: ["runId", "startedAt", "finishedAt", "overallStatus", "projectCount",
+                    "successCount", "failedCount", "buildSuccessCount", "recordProvider",
+                    "recordStatus", "resultJson"]
+        # project-update 的完整 41 列老 deploy 超集见 packages/cli/deploy.example.yaml；
+        # 不要为了手写方便缩短 header。
 
 deployProfiles:
   ppe:

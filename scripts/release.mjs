@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Manual lockstep release for the ten `@understand-anyway/*` packages.
+// Manual lockstep release for the `@understand-anyway/*` workspace packages.
 //
 // Usage:
 //   node scripts/release.mjs <patch|minor|major|X.Y.Z|X.Y.Z-tag.N|prerelease <tag>> [--tag <dist-tag>] [--dry-run] [--skip-git] [--skip-publish] [--registry <url>]
@@ -25,7 +25,7 @@
 //
 // Execution order (chosen for recoverability: commit/tag locally before the
 // irreversible npm publish, push to the remote only after npm succeeds):
-//   1. Sanity: valid bump, ten packages in lockstep, clean tree for real
+//   1. Sanity: valid bump, workspace packages in lockstep, clean tree for real
 //      execution, on `main` and synced with `origin/main` (unless --skip-git),
 //      target versions absent from the registry, `npm whoami` succeeds for
 //      public npm publishes (unless --skip-publish).

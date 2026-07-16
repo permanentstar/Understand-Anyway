@@ -15,7 +15,7 @@
 
 ## 验收点
 
-1. Verdaccio storage 中包含全部 6 个公开包：`plugin-api / core / gateway / provider-feishu-auth / provider-feishu-sheets / cli`。
+1. Verdaccio storage 中包含全部公开 workspace 包。
 2. 安装目录中 `node_modules/@understand-anyway/cli/package.json` 的依赖全部是版本号，没有 `workspace:*`。
 3. 在 mini-project 上跑出的 versioned 布局与 [repo-checkout/expected-layout.md](../repo-checkout/expected-layout.md) 完全一致。
 4. 浏览器再次访问 `http://127.0.0.1:18666/` 行为与 repo-checkout 用例一致（含 token、HTML transform、SPA 资源 200）。

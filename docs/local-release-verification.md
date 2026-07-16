@@ -123,15 +123,9 @@ node scripts/release.mjs patch --skip-git --registry "$LOCAL_REGISTRY"
 - release script 按真实发布链路执行版本改写、`pnpm install --lockfile-only`、
   `pnpm -r build`、逐包 `pnpm publish packages/<pkg-dir> --dry-run`，然后按依赖顺序发布到本地 registry。
 - 根包 `understand-anyway` 因 `private: true` 不发布。
-- 6 个公开包发布到本地 registry：
-  - `@understand-anyway/plugin-api`
-  - `@understand-anyway/core`
-  - `@understand-anyway/gateway`
-  - `@understand-anyway/provider-feishu-auth`
-  - `@understand-anyway/provider-feishu-sheets`
-  - `@understand-anyway/cli`
+- 所有公开 workspace 包发布到本地 registry。
 - 包内 `workspace:*` 依赖在 publish 阶段被替换为本次演练的目标版本号。
-- 因为这是 `--skip-git` 演练，不会 commit/tag/push；命令会留下 6 个
+- 因为这是 `--skip-git` 演练，不会 commit/tag/push；命令会留下
   `packages/*/package.json` 和 `pnpm-lock.yaml` 的版本变更。验证结束后如不保留
   该版本，请恢复这些文件。
 
@@ -334,5 +328,5 @@ pnpm exec understand-anyway gateway publish --projects-root "$PROJECTS_ROOT" --p
 
 - npm 上 `@understand-anyway` scope 具有发布权限。
 - `node scripts/release.mjs patch --dry-run` 在干净的 `main` 上能打印正确 release plan；真实前置检查在非 dry-run 发布或 Verdaccio 演练路径执行。
-- `scripts/release.mjs` 在 Verdaccio 上以 `--skip-git --registry http://127.0.0.1:4873` 演练能顺利到发包成功；演练后还原 6 个 package.json 与 `pnpm-lock.yaml` 的版本号改动。
+- `scripts/release.mjs` 在 Verdaccio 上以 `--skip-git --registry http://127.0.0.1:4873` 演练能顺利到发包成功；演练后还原所有 workspace `package.json` 与 `pnpm-lock.yaml` 的版本号改动。
 - npm 包、git tag、GitHub Release notes（`v<version>`）与版本号一致。

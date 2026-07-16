@@ -79,6 +79,7 @@ docs/release-tests/
 | 8 | external | PPE npm-installed | 安装态真实部署 | `pnpm run release:gate -- --external ppe-npm-installed` | 按需 | — |
 | 9 | external | PPE ops/versioning | 外部环境运维命令 | `pnpm run release:gate -- --external ppe-ops` | 按需 | — |
 | 10 | external | PPE real LLM | trae-cli-v2 / traex | `pnpm run release:gate -- --external ppe-real-llm` | 按需 | — |
+| 11 | external | PPE OSS install | 标准 OSS 安装形态 | `pnpm run release:gate -- --external ppe-oss-release` | 按需 | — |
 
 ## 用例链接
 

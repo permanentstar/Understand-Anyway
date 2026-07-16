@@ -10,7 +10,6 @@ const yaml = readFileSync(configPath, "utf8");
 assert.match(yaml, /package:\s*"@understand-anyway\/provider-trae-cli-v2"/);
 assert.match(yaml, /command:\s*"traex"/);
 assert.doesNotMatch(yaml, /\/home\//, "deploy.ppe.yaml must not commit machine-local absolute paths");
-assert.doesNotMatch(yaml, /suheng\.cloud/, "deploy.ppe.yaml must not commit user-specific host paths");
 assert.doesNotMatch(yaml, /^\s*-\s*"-C"\s*$/m, "deploy.ppe.yaml should not force a local LLM workdir");
 
 console.log("deploy-ppe-config.test.mjs: all checks passed");
