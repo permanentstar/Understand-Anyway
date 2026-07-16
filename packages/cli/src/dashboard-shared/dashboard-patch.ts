@@ -56,6 +56,7 @@ const PATCH_WORKSPACE_DIRNAME = "understand-anything-plugin-patched";
 const PATCH_METADATA_FILENAME = "upstream-plugin-patch.json";
 const GRAPH_VIEW_RELATIVE_PATH = "packages/dashboard/src/components/GraphView.tsx";
 const APP_RELATIVE_PATH = "packages/dashboard/src/App.tsx";
+const CODE_VIEWER_RELATIVE_PATH = "packages/dashboard/src/components/CodeViewer.tsx";
 const SEARCH_BAR_RELATIVE_PATH = "packages/dashboard/src/components/SearchBar.tsx";
 const STORE_RELATIVE_PATH = "packages/dashboard/src/store.ts";
 const ROOT_PACKAGE_JSON = "package.json";
@@ -218,6 +219,15 @@ export function patchAppSource(source: string): string {
   );
 }
 
+export function patchCodeViewerSource(source: string): string {
+  return replaceOnce(
+    source,
+    "  return `/file-content.json?${params.toString()}`;\n",
+    "  const match = window.location.pathname.match(/^\\/project\\/[^/]+/);\n  const routePrefix = match ? match[0] : \"\";\n  return `${routePrefix}/file-content.json?${params.toString()}`;\n",
+    "CodeViewer file-content URL respects project route prefix",
+  );
+}
+
 export function patchStoreSource(source: string): string {
   let patched = source;
 
@@ -267,6 +277,10 @@ function applyDashboardPatches(
     const originalAppSource = read(appPath, "utf8");
     const patchedAppSource = patchAppSource(originalAppSource);
     write(appPath, patchedAppSource, "utf8");
+    const codeViewerPath = resolve(patchedRoot, CODE_VIEWER_RELATIVE_PATH);
+    const originalCodeViewerSource = read(codeViewerPath, "utf8");
+    const patchedCodeViewerSource = patchCodeViewerSource(originalCodeViewerSource);
+    write(codeViewerPath, patchedCodeViewerSource, "utf8");
     const searchBarPath = resolve(patchedRoot, SEARCH_BAR_RELATIVE_PATH);
     const originalSearchBarSource = read(searchBarPath, "utf8");
     const patchedSearchBarSource = patchSearchBarSource(originalSearchBarSource);
@@ -275,7 +289,15 @@ function applyDashboardPatches(
     const originalStoreSource = read(storePath, "utf8");
     const patchedStoreSource = patchStoreSource(originalStoreSource);
     write(storePath, patchedStoreSource, "utf8");
-    return { patchedFiles: [GRAPH_VIEW_RELATIVE_PATH, APP_RELATIVE_PATH, SEARCH_BAR_RELATIVE_PATH, STORE_RELATIVE_PATH] };
+    return {
+      patchedFiles: [
+        GRAPH_VIEW_RELATIVE_PATH,
+        APP_RELATIVE_PATH,
+        CODE_VIEWER_RELATIVE_PATH,
+        SEARCH_BAR_RELATIVE_PATH,
+        STORE_RELATIVE_PATH,
+      ],
+    };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     throw new Error(

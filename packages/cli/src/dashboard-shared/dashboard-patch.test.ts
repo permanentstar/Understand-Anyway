@@ -3,6 +3,7 @@ import {
   PATCH_ID,
   patchGraphViewSource,
   patchAppSource,
+  patchCodeViewerSource,
   patchSearchBarSource,
   patchStoreSource,
   preparePatchedUpstreamPluginRoot,
@@ -63,6 +64,15 @@ describe("patchAppSource", () => {
     const patched = patchAppSource(source);
     expect(patched).toContain("window.location.pathname.match(/^\\/project\\/[^/]+/)");
     expect(patched).toContain("const path = `${routePrefix}/${fileName}`;");
+  });
+});
+
+describe("patchCodeViewerSource", () => {
+  it("routes file-content URLs through /project/<id>/ when mounted under the portal gateway", () => {
+    const source = "  return `/file-content.json?${params.toString()}`;\n";
+    const patched = patchCodeViewerSource(source);
+    expect(patched).toContain("window.location.pathname.match(/^\\/project\\/[^/]+/)");
+    expect(patched).toContain("return `${routePrefix}/file-content.json?${");
   });
 });
 
@@ -174,7 +184,11 @@ describe("preparePatchedUpstreamPluginRoot — anchor failure surfaces with PATC
           "App.tsx",
           "  const path = `/${fileName}`;\n  return token ? `${path}?token=${encodeURIComponent(token)}` : path;\n",
         ],
-        [
+      [
+        "CodeViewer.tsx",
+        "  return `/file-content.json?${params.toString()}`;\n",
+      ],
+      [
         "SearchBar.tsx",
         "" +
           'import { useCallback, useEffect, useMemo, useRef, useState } from "react";\n' +
@@ -205,7 +219,8 @@ describe("preparePatchedUpstreamPluginRoot — anchor failure surfaces with PATC
         const p = String(path);
         if (p.endsWith("package.json")) return JSON.stringify({ version: "1.2.3" });
         if (p.endsWith("/GraphView.tsx")) return sources.get("GraphView.tsx") ?? "";
-          if (p.endsWith("/App.tsx")) return sources.get("App.tsx") ?? "";
+        if (p.endsWith("/App.tsx")) return sources.get("App.tsx") ?? "";
+        if (p.endsWith("/CodeViewer.tsx")) return sources.get("CodeViewer.tsx") ?? "";
         if (p.endsWith("/SearchBar.tsx")) return sources.get("SearchBar.tsx") ?? "";
         if (p.endsWith("/store.ts")) return sources.get("store.ts") ?? "";
         return "";
@@ -236,7 +251,8 @@ describe("preparePatchedUpstreamPluginRoot — anchor failure surfaces with PATC
     expect(metadata.upstreamVersion).toBe("1.2.3");
     expect(metadata.patchedFiles).toEqual([
       "packages/dashboard/src/components/GraphView.tsx",
-        "packages/dashboard/src/App.tsx",
+      "packages/dashboard/src/App.tsx",
+      "packages/dashboard/src/components/CodeViewer.tsx",
       "packages/dashboard/src/components/SearchBar.tsx",
       "packages/dashboard/src/store.ts",
     ]);
