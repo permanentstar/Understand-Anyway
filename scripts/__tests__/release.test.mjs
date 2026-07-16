@@ -5,9 +5,12 @@
 import { strict as assert } from "node:assert";
 import {
   PUBLIC_NPM_REGISTRY,
+  TAG_RE,
   assertNoPublishedVersionConflicts,
   bumpVersion,
+  compareVersions,
   originMainFetchCommand,
+  parseFullVersion,
   parseNpmVersionsOutput,
   parseFlags,
   publishFailureRecoveryMessage,
@@ -69,9 +72,85 @@ test("bumpVersion rejects malformed current version", () => {
 });
 
 test("bumpVersion rejects malformed level", () => {
-  assert.throws(() => bumpVersion("0.0.1", "prerelease"), /bump level must be/);
   assert.throws(() => bumpVersion("0.0.1", "1.2"), /bump level must be/);
   assert.throws(() => bumpVersion("0.0.1", "v1.0.0"), /bump level must be/);
+  assert.throws(() => bumpVersion("0.0.1", "unknown"), /bump level must be/);
+});
+
+// --- bumpVersion prerelease ---
+test("bumpVersion prerelease starts counter at 0 from a core version", () => {
+  assert.equal(bumpVersion("0.0.1", "prerelease", "next"), "0.0.1-next.0");
+  assert.equal(bumpVersion("1.2.3", "prerelease", "beta"), "1.2.3-beta.0");
+});
+
+test("bumpVersion prerelease increments counter with the same tag", () => {
+  assert.equal(bumpVersion("0.0.1-next.0", "prerelease", "next"), "0.0.1-next.1");
+  assert.equal(bumpVersion("0.0.1-next.5", "prerelease", "next"), "0.0.1-next.6");
+});
+
+test("bumpVersion prerelease resets counter when tag switches", () => {
+  assert.equal(bumpVersion("0.0.1-next.0", "prerelease", "beta"), "0.0.1-beta.0");
+});
+
+test("bumpVersion release-out strips prerelease suffix on patch/minor/major", () => {
+  assert.equal(bumpVersion("0.0.1-next.0", "patch"), "0.0.1");
+  assert.equal(bumpVersion("0.0.1-next.5", "patch"), "0.0.1");
+  assert.equal(bumpVersion("0.0.1-next.0", "minor"), "0.1.0");
+  assert.equal(bumpVersion("0.0.1-next.0", "major"), "1.0.0");
+});
+
+test("bumpVersion explicit release-out from prerelease", () => {
+  assert.equal(bumpVersion("0.0.1-next.0", "0.0.1"), "0.0.1");
+  assert.equal(bumpVersion("0.0.1-next.5", "0.0.1"), "0.0.1");
+});
+
+test("bumpVersion explicit prerelease from core", () => {
+  assert.equal(bumpVersion("0.0.1", "0.0.1-next.0"), "0.0.1-next.0");
+  assert.equal(bumpVersion("0.0.1", "0.0.2-next.0"), "0.0.2-next.0");
+});
+
+test("bumpVersion explicit prerelease must advance", () => {
+  assert.throws(() => bumpVersion("0.0.1-next.0", "0.0.1-next.0"), /must be greater/);
+  assert.throws(() => bumpVersion("0.0.1-next.1", "0.0.1-next.0"), /must be greater/);
+});
+
+test("bumpVersion prerelease requires a tag argument", () => {
+  assert.throws(() => bumpVersion("0.0.1", "prerelease"), /prerelease.*tag/i);
+  assert.throws(() => bumpVersion("0.0.1", "prerelease", ""), /prerelease.*tag/i);
+});
+
+test("bumpVersion prerelease rejects invalid tag names", () => {
+  assert.throws(() => bumpVersion("0.0.1", "prerelease", "01bad"), /invalid.*tag/i);
+  assert.throws(() => bumpVersion("0.0.1", "prerelease", "-bad"), /invalid.*tag/i);
+  assert.throws(() => bumpVersion("0.0.1", "prerelease", "bad tag"), /invalid.*tag/i);
+});
+
+// --- compareVersions ---
+test("compareVersions orders prerelease before core, and lexicographically", () => {
+  assert.equal(compareVersions(parseFullVersion("0.0.1-next.0"), parseFullVersion("0.0.1-next.1")) < 0, true);
+  assert.equal(compareVersions(parseFullVersion("0.0.1-next.1"), parseFullVersion("0.0.1")) < 0, true);
+  assert.equal(compareVersions(parseFullVersion("0.0.1"), parseFullVersion("0.0.2-next.0")) < 0, true);
+  assert.equal(compareVersions(parseFullVersion("0.0.2-next.0"), parseFullVersion("0.0.2")) < 0, true);
+  assert.equal(compareVersions(parseFullVersion("0.0.1-next.0"), parseFullVersion("0.0.1-next.0")), 0);
+});
+
+// --- parseFullVersion / TAG_RE ---
+test("parseFullVersion parses core and prerelease shapes", () => {
+  assert.deepEqual(parseFullVersion("0.0.1"), { core: [0, 0, 1], prerelease: null });
+  assert.deepEqual(parseFullVersion("1.2.3-next.7"), { core: [1, 2, 3], prerelease: { tag: "next", num: 7 } });
+  assert.equal(parseFullVersion("bad"), null);
+  assert.equal(parseFullVersion("0.0.1-01bad.0"), null);
+});
+
+test("TAG_RE matches legal npm dist-tag / prerelease tag names", () => {
+  assert.equal(TAG_RE.test("next"), true);
+  assert.equal(TAG_RE.test("latest"), true);
+  assert.equal(TAG_RE.test("beta1"), true);
+  assert.equal(TAG_RE.test("rc-1"), true);
+  assert.equal(TAG_RE.test("01bad"), false);
+  assert.equal(TAG_RE.test("-bad"), false);
+  assert.equal(TAG_RE.test(""), false);
+  assert.equal(TAG_RE.test("bad tag"), false);
 });
 
 // --- readLockstepVersion ---
@@ -99,7 +178,7 @@ test("readLockstepVersion tolerates single package", () => {
 test("parseFlags accepts dry-run, skip flags, and registry", () => {
   assert.deepEqual(
     parseFlags(["--dry-run", "--skip-git", "--skip-publish", "--registry", "http://127.0.0.1:4873/"]),
-    { dryRun: true, skipGit: true, skipPublish: true, registry: "http://127.0.0.1:4873" },
+    { dryRun: true, skipGit: true, skipPublish: true, registry: "http://127.0.0.1:4873", tag: "latest" },
   );
 });
 
@@ -109,6 +188,7 @@ test("parseFlags defaults to the public npm registry", () => {
     skipGit: false,
     skipPublish: false,
     registry: PUBLIC_NPM_REGISTRY,
+    tag: "latest",
   });
 });
 
@@ -132,6 +212,24 @@ test("parseFlags rejects unsafe registry strings", () => {
   assert.throws(() => parseFlags(["--registry", "https://user:pass@registry.npmjs.org/"]), /invalid --registry URL/);
 });
 
+test("parseFlags accepts --tag and defaults to latest", () => {
+  assert.equal(parseFlags(["--tag", "next"]).tag, "next");
+  assert.equal(parseFlags(["--tag", "beta"]).tag, "beta");
+  assert.equal(parseFlags([]).tag, "latest");
+});
+
+test("parseFlags rejects missing --tag value", () => {
+  assert.throws(() => parseFlags(["--tag"]), /requires a value/);
+  assert.throws(() => parseFlags(["--tag", "--dry-run"]), /requires a value/);
+});
+
+test("parseFlags rejects invalid --tag names", () => {
+  assert.throws(() => parseFlags(["--tag", "bad tag"]), /invalid --tag/);
+  assert.throws(() => parseFlags(["--tag", "01bad"]), /invalid --tag/);
+  assert.throws(() => parseFlags(["--tag", "-bad"]), /invalid --tag/);
+  assert.throws(() => parseFlags(["--tag", ""]), /requires a value/);
+});
+
 // --- release option policy ---
 test("validateReleaseOptions allows the normal public npm release path", () => {
   assert.doesNotThrow(() => validateReleaseOptions({
@@ -139,6 +237,8 @@ test("validateReleaseOptions allows the normal public npm release path", () => {
     skipGit: false,
     skipPublish: false,
     registry: PUBLIC_NPM_REGISTRY,
+    tag: "latest",
+    nextVersion: "0.0.2",
   }));
 });
 
@@ -148,6 +248,8 @@ test("validateReleaseOptions allows Verdaccio rehearsal only without git mutatio
     skipGit: true,
     skipPublish: false,
     registry: "http://127.0.0.1:4873",
+    tag: "latest",
+    nextVersion: "0.0.2",
   }));
   assert.throws(
     () => validateReleaseOptions({
@@ -155,6 +257,8 @@ test("validateReleaseOptions allows Verdaccio rehearsal only without git mutatio
       skipGit: false,
       skipPublish: false,
       registry: "http://127.0.0.1:4873",
+      tag: "latest",
+      nextVersion: "0.0.2",
     }),
     /custom registry.*--skip-git/,
   );
@@ -167,6 +271,8 @@ test("validateReleaseOptions rejects public npm publish without git", () => {
       skipGit: true,
       skipPublish: false,
       registry: PUBLIC_NPM_REGISTRY,
+      tag: "latest",
+      nextVersion: "0.0.2",
     }),
     /public npm.*without git/,
   );
@@ -179,9 +285,47 @@ test("validateReleaseOptions keeps skip-publish tied to skip-git", () => {
       skipGit: false,
       skipPublish: true,
       registry: PUBLIC_NPM_REGISTRY,
+      tag: "latest",
+      nextVersion: "0.0.2",
     }),
     /--skip-publish requires --skip-git/,
   );
+});
+
+test("validateReleaseOptions rejects prerelease targeting the latest dist-tag", () => {
+  assert.throws(
+    () => validateReleaseOptions({
+      dryRun: false,
+      skipGit: false,
+      skipPublish: false,
+      registry: PUBLIC_NPM_REGISTRY,
+      tag: "latest",
+      nextVersion: "0.0.1-next.0",
+    }),
+    /prerelease.*latest/i,
+  );
+});
+
+test("validateReleaseOptions allows core version on a non-latest dist-tag", () => {
+  assert.doesNotThrow(() => validateReleaseOptions({
+    dryRun: false,
+    skipGit: false,
+    skipPublish: false,
+    registry: PUBLIC_NPM_REGISTRY,
+    tag: "next",
+    nextVersion: "0.0.1",
+  }));
+});
+
+test("validateReleaseOptions allows prerelease targeting a non-latest dist-tag", () => {
+  assert.doesNotThrow(() => validateReleaseOptions({
+    dryRun: false,
+    skipGit: false,
+    skipPublish: false,
+    registry: PUBLIC_NPM_REGISTRY,
+    tag: "next",
+    nextVersion: "0.0.1-next.0",
+  }));
 });
 
 test("publishCommand always runs from one package dir and pins the target registry", () => {
@@ -194,7 +338,43 @@ test("publishCommand always runs from one package dir and pins the target regist
     "--no-git-checks",
     "--registry",
     PUBLIC_NPM_REGISTRY,
+    "--tag",
+    "latest",
   ]);
+});
+
+test("publishCommand appends --tag when a dist-tag is provided", () => {
+  assert.deepEqual(publishCommand("packages/plugin-api", PUBLIC_NPM_REGISTRY, { tag: "next" }), [
+    "pnpm",
+    "publish",
+    "packages/plugin-api",
+    "--access",
+    "public",
+    "--no-git-checks",
+    "--registry",
+    PUBLIC_NPM_REGISTRY,
+    "--tag",
+    "next",
+  ]);
+});
+
+test("publishCommand emits --dry-run and --tag together", () => {
+  assert.deepEqual(
+    publishCommand("packages/cli", PUBLIC_NPM_REGISTRY, { tag: "next", dryRun: true }),
+    [
+      "pnpm",
+      "publish",
+      "packages/cli",
+      "--access",
+      "public",
+      "--no-git-checks",
+      "--registry",
+      PUBLIC_NPM_REGISTRY,
+      "--dry-run",
+      "--tag",
+      "next",
+    ],
+  );
 });
 
 test("publishCommands publishes dependency packages before the CLI", () => {
@@ -221,7 +401,7 @@ test("shouldRunPublicNpmWhoami only applies to real public npm publishes", () =>
 });
 
 test("git remote commands are explicit and refresh origin/main", () => {
-  assert.deepEqual(originMainFetchCommand(), ["git", "fetch", "origin", "main:refs/remotes/origin/main"]);
+  assert.deepEqual(originMainFetchCommand(), ["git", "fetch", "origin", "+refs/heads/main:refs/remotes/origin/main"]);
   assert.deepEqual(pushCommand(), ["git", "push", "origin", "main", "--follow-tags"]);
 });
 
@@ -238,7 +418,10 @@ test("publish failure recovery message does not suggest rerunning the release bu
 test("parseNpmVersionsOutput handles npm JSON shapes", () => {
   assert.deepEqual(parseNpmVersionsOutput(""), []);
   assert.deepEqual(parseNpmVersionsOutput("\"0.0.1\""), ["0.0.1"]);
-  assert.deepEqual(parseNpmVersionsOutput("[\"0.0.1\",\"0.0.2\",\"1.0.0-beta.1\"]"), ["0.0.1", "0.0.2"]);
+  assert.deepEqual(
+    parseNpmVersionsOutput("[\"0.0.1\",\"0.0.1-next.0\",\"1.0.0-beta.1\"]"),
+    ["0.0.1", "0.0.1-next.0", "1.0.0-beta.1"],
+  );
 });
 
 test("assertNoPublishedVersionConflicts accepts empty or older registry versions", () => {
@@ -258,7 +441,7 @@ test("assertNoPublishedVersionConflicts accepts empty or older registry versions
   }));
   assert.doesNotThrow(() => assertNoPublishedVersionConflicts({
     pkgName: "@understand-anyway/cli",
-    publishedVersions: ["0.0.1", "1.0.0-beta.1", "not-a-version"],
+    publishedVersions: ["0.0.1", "not-a-version"],
     baseline: "0.0.1",
     next: "0.0.2",
     registry: PUBLIC_NPM_REGISTRY,
@@ -288,6 +471,65 @@ test("assertNoPublishedVersionConflicts rejects stale local baselines", () => {
       registry: PUBLIC_NPM_REGISTRY,
     }),
     /baseline 0\.0\.1 is stale/,
+  );
+});
+
+test("assertNoPublishedVersionConflicts allows a prerelease bump when only older prereleases exist", () => {
+  assert.doesNotThrow(() => assertNoPublishedVersionConflicts({
+    pkgName: "@understand-anyway/cli",
+    publishedVersions: ["0.0.1-next.0"],
+    baseline: "0.0.1-next.0",
+    next: "0.0.1-next.1",
+    registry: PUBLIC_NPM_REGISTRY,
+  }));
+});
+
+test("assertNoPublishedVersionConflicts rejects a prerelease that is already published", () => {
+  assert.throws(
+    () => assertNoPublishedVersionConflicts({
+      pkgName: "@understand-anyway/cli",
+      publishedVersions: ["0.0.1-next.0"],
+      baseline: "0.0.1-next.0",
+      next: "0.0.1-next.0",
+      registry: PUBLIC_NPM_REGISTRY,
+    }),
+    /target version already exists/,
+  );
+});
+
+test("assertNoPublishedVersionConflicts rejects stale prerelease baselines", () => {
+  assert.throws(
+    () => assertNoPublishedVersionConflicts({
+      pkgName: "@understand-anyway/cli",
+      publishedVersions: ["0.0.1-next.2"],
+      baseline: "0.0.1-next.0",
+      next: "0.0.1-next.1",
+      registry: PUBLIC_NPM_REGISTRY,
+    }),
+    /stale/,
+  );
+});
+
+test("assertNoPublishedVersionConflicts allows core release-out over older prereleases", () => {
+  assert.doesNotThrow(() => assertNoPublishedVersionConflicts({
+    pkgName: "@understand-anyway/cli",
+    publishedVersions: ["0.0.1-next.2"],
+    baseline: "0.0.1-next.0",
+    next: "0.0.1",
+    registry: PUBLIC_NPM_REGISTRY,
+  }));
+});
+
+test("assertNoPublishedVersionConflicts rejects prerelease when core release already exists", () => {
+  assert.throws(
+    () => assertNoPublishedVersionConflicts({
+      pkgName: "@understand-anyway/cli",
+      publishedVersions: ["0.0.1"],
+      baseline: "0.0.1",
+      next: "0.0.1-next.0",
+      registry: PUBLIC_NPM_REGISTRY,
+    }),
+    /stale/,
   );
 });
 
