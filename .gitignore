@@ -18,3 +18,4 @@ coverage/
 
 # Scratch
 *.tmp
+.release-gate/

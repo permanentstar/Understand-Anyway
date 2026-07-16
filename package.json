@@ -22,8 +22,9 @@
     "lint:isolation": "node scripts/lint-isolation.mjs",
     "lint:isolation:test": "node scripts/lint-isolation.test.mjs",
     "lint:scripts": "node scripts/lint-scripts.mjs",
-    "test:scripts": "node scripts/lib/__tests__/discover-projects.test.mjs && node scripts/lib/__tests__/upsert-project-registry.test.mjs && node scripts/__tests__/refresh-prod-server.test.mjs && node scripts/__tests__/nightly-project-sync.test.mjs && node scripts/__tests__/daily-update.test.mjs && node scripts/__tests__/aggregate-nightly.test.mjs && node scripts/__tests__/aggregate-daily.test.mjs && node scripts/__tests__/release.test.mjs && node scripts/__tests__/local-delivery-tests.test.mjs && node scripts/regression-daily-update.mjs",
+    "test:scripts": "node scripts/lib/__tests__/discover-projects.test.mjs && node scripts/lib/__tests__/upsert-project-registry.test.mjs && node scripts/__tests__/refresh-prod-server.test.mjs && node scripts/__tests__/nightly-project-sync.test.mjs && node scripts/__tests__/daily-update.test.mjs && node scripts/__tests__/aggregate-nightly.test.mjs && node scripts/__tests__/aggregate-daily.test.mjs && node scripts/__tests__/release.test.mjs && node scripts/__tests__/local-delivery-tests.test.mjs && node scripts/__tests__/release-gate.test.mjs && node scripts/__tests__/release-gate-ppe.test.mjs && node scripts/__tests__/release-gate-ppe-env.test.mjs && node scripts/regression-daily-update.mjs",
     "delivery:local": "node scripts/local-delivery-tests.mjs",
+    "release:gate": "node scripts/release-gate.mjs",
     "release": "node scripts/release.mjs"
   },
   "devDependencies": {

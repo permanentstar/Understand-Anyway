@@ -6,7 +6,7 @@
 2. **其他全部走 YAML / env**：LLM、record 接入、providers、retry 策略、worksheet 等 — 调一次 yaml 写到 `deploy.yaml`，从此不再翻 CLI。
 3. **每台机器固定一份身份**：`~/.env` 写 `UA_DEPLOY_PROFILE=prod|ppe|dev`，CLI 只在临时换身份时显式覆盖。
 
-> 完整测试矩阵收口在 [release-tests/README.md](./release-tests/README.md)；具体部署形态约束见 [release-tests/local/repo-checkout/expected-layout.md](./release-tests/local/repo-checkout/expected-layout.md)。
+> 发版前统一门禁入口为 `pnpm run release:gate`。完整测试矩阵收口在 [release-tests/README.md](./release-tests/README.md)；具体部署形态约束见 [release-tests/local/repo-checkout/expected-layout.md](./release-tests/local/repo-checkout/expected-layout.md)。
 
 ---
 
@@ -151,6 +151,10 @@ echo 'UA_PLUGIN_ROOT=...'     >> ~/.env
 
 scripts/daily-update.sh --profile small --no-pull
 ```
+
+首次 clean state 不需要先手工跑一次 full build：`nightly-project-sync.sh`
+会在 state root 还没有 `knowledge-graph.json` 时自动 bootstrap 一次 full
+build，后续 nightly 再恢复到 `--incremental --exclude-tests`。
 
 ### 1.8 gateway runtime 操作
 
@@ -300,5 +304,8 @@ understand-anyway serve --project <id>   # 前台 serve，不走 daemon
 - **不允许 auto-detect**：deploy profile 必须显式声明（CLI 或 env），SSH-based heuristics 已废弃。
 - **不允许 deprecated alias**：旧的 `--feishu-sheet` / `--llm-profile` / `--all-builds` / `--restart-gateway` / `--print-deploy-context` 全部移除。
 - **不允许 LLM/record 走 CLI**：所有 LLM provider、retry policy、record sink 配置只接受 yaml。
-- **不允许 incremental build 之外的 mode 通过 sh 脚本指定**：nightly 默认 `--incremental --exclude-tests`。要全量请直接 `understand-anyway build` 单独跑。
+- **不允许通过 sh 脚本暴露 full/resume mode 开关**：nightly 默认走
+  `--incremental --exclude-tests`；若 state root 尚无 graph（如新机首次
+  bootstrap），脚本内部会自动先跑一次 full build。要强制全量，仍应直接
+  `understand-anyway build` 单独跑。
 - **救急路径优先用 CLI 子命令**：例如重建单项目 dashboard-dist 应该用 `understand-anyway dashboard build-dist`，而不是给编排脚本加 `--rebuild` 开关。

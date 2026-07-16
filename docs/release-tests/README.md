@@ -4,6 +4,28 @@
 
 单元/契约测试仍由 Vitest 在 `packages/*/src/**/*.test.ts` 与 `scripts/__tests__/**` 里跑，不进入本目录。
 
+## 发版前主入口
+
+每次 public release 前，优先跑统一门禁：
+
+```bash
+export UA_PLUGIN_ROOT="$HOME/.understand-anything/repo/understand-anything-plugin"  # 或本机实际路径
+pnpm run release:gate
+```
+
+如本次发版明确要求外部环境，也从这里追加：
+
+```bash
+source scripts/release-gate-ppe-env.sh
+pnpm run release:gate -- --external ppe-repo --external ppe-npm-installed
+```
+
+说明：
+
+- `release:gate` 是发版前唯一主入口
+- 本地门禁始终必跑
+- 外部环境默认不跑，但一旦显式请求，就变成阻塞项
+
 ## 本地交付测试集（必跑）
 
 每次研发交付前必须执行：
@@ -31,7 +53,10 @@ docs/release-tests/
 ├── local/                                        # 第一层：本机闭环
 │   ├── repo-checkout/                            # repo clone + 直接跑
 │   ├── npm-verdaccio/                            # 本地 npm registry 模拟
+│   ├── ops-versioning/                           # 本地常规运维命令矩阵
 │   └── shared-gateway/                           # 多项目共享 gateway 拓扑
+└── external/                                     # 第二层：按需外部环境
+    └── ppe/
 ```
 
 | 层级 | 目录 | 入口安装方式 | 适用阶段 |
@@ -44,12 +69,16 @@ docs/release-tests/
 
 | # | 层级 | 用例 | 触达组件 | 验证方式 | 状态 | 阻塞 |
 |---|------|------|---------|---------|------|------|
-| 1 | local | repo-checkout 单项目部署 | scripts + cli + gateway | `pnpm run delivery:local --only repo-checkout` (HTTP 断言) | 必跑（auto） | — |
-| 2 | local | versioned 项目布局 | `project-state publish` | runbook + 单测 | 待 | #1 |
+| 1 | local | repo-checkout 单项目部署 | scripts + cli + gateway | `pnpm run delivery:local --only repo-checkout` | 必跑（auto） | — |
+| 2 | local | Verdaccio 本地 npm install | release pipeline | `pnpm run delivery:local --only verdaccio` | 必跑（auto） | #1 |
 | 3 | local | shared gateway 多项目 + LLM | portal / project-router + LLM | `pnpm run delivery:local --only shared-gateway` | 必跑（auto） | #2 |
-| 4 | local | Vite assets 子路径 transform | prod-static | 浏览器 + 单测 | 待 | #2 |
-| 5 | local | daily-update 全链路 mock LLM | daily-update.sh | 文件断言 | 待 | #2 |
-| 6 | local | Verdaccio 本地 npm install | release pipeline | `pnpm run delivery:local --only verdaccio` | 必跑（auto） | #5 |
+| 4 | local | build mode + repair | full/incremental/resume/backfill/repair | `node scripts/release-gate-build-modes.mjs` | 必跑（auto） | #1 |
+| 5 | local | 常规运维命令矩阵 | dashboard/gateway/project-state/serve/notify | `node scripts/release-gate-ops.mjs` | 必跑（auto） | #4 |
+| 6 | local | daily-update 幂等链路 | daily-update.sh | `node scripts/release-gate-daily.mjs` | 必跑（auto） | #5 |
+| 7 | external | PPE repo-checkout | 真实外部部署 | `pnpm run release:gate -- --external ppe-repo` | 按需 | — |
+| 8 | external | PPE npm-installed | 安装态真实部署 | `pnpm run release:gate -- --external ppe-npm-installed` | 按需 | — |
+| 9 | external | PPE ops/versioning | 外部环境运维命令 | `pnpm run release:gate -- --external ppe-ops` | 按需 | — |
+| 10 | external | PPE real LLM | coco / cli-spawn | `pnpm run release:gate -- --external ppe-real-llm` | 按需 | — |
 
 ## 用例链接
 
@@ -58,8 +87,13 @@ docs/release-tests/
 - [local/repo-checkout/expected-layout.md](./local/repo-checkout/expected-layout.md)
 - [local/npm-verdaccio/plan.md](./local/npm-verdaccio/plan.md)
 - [local/npm-verdaccio/runbook.md](./local/npm-verdaccio/runbook.md)
+- [local/ops-versioning/plan.md](./local/ops-versioning/plan.md)
+- [local/ops-versioning/runbook.md](./local/ops-versioning/runbook.md)
 - [local/shared-gateway/plan.md](./local/shared-gateway/plan.md)
 - [local/shared-gateway/runbook.md](./local/shared-gateway/runbook.md)
+- [external/README.md](./external/README.md)
+- [external/ppe/plan.md](./external/ppe/plan.md)
+- [external/ppe/runbook.md](./external/ppe/runbook.md)
 
 ## 共通约束
 

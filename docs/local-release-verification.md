@@ -247,7 +247,20 @@ pnpm exec understand-anyway gateway list \
 
 ## 4. 自动化脚本
 
-一键本地交付脚本已沉淀为：
+发版前主入口已沉淀为：
+
+```bash
+pnpm run release:gate
+```
+
+它会强制执行本地必跑门禁；如本次发版明确要求外部环境，再显式追加：
+
+```bash
+source scripts/release-gate-ppe-env.sh
+pnpm run release:gate -- --external ppe-repo --external ppe-npm-installed
+```
+
+原有一键本地交付脚本继续保留为门禁内部组件：
 
 ```bash
 pnpm run delivery:local
@@ -263,17 +276,14 @@ GitHub 回归策略：
 
 ## 5. 每次本地发布验证 checklist
 
-**首选：跑一键脚本**
+**首选：跑统一门禁**
 
 ```bash
 export UA_PLUGIN_ROOT="/path/to/understand-anything-plugin"
-pnpm build
-pnpm run delivery:local              # oss profile：case 3 用 mock LLM
-# 拿真实 LLM 跑一次（需 PATH 上有 `llm` CLI 或自定义命令）:
-pnpm run delivery:local --profile real-llm
+pnpm run release:gate
 ```
 
-脚本退出码 0 即视为本地交付通过；脚本已覆盖 repo 构建、Verdaccio 发包安装、共享 gateway 多项目 + LLM 富化产物 + token 隔离。详见 [docs/release-tests/README.md](./release-tests/README.md)。
+门禁退出码 0 即视为本地发版门禁通过；详见 [docs/release-tests/README.md](./release-tests/README.md)。
 
 **手工 fallback：** 仅在 `pnpm run delivery:local` 失败、需要单步排查时使用：
 
