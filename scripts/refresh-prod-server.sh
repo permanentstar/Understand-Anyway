@@ -201,13 +201,14 @@ prune_registry_records() {
     return 0
   fi
   ROOT_DIR_ENV="$ROOT_DIR" \
+  SCRIPT_DIR_ENV="$SCRIPT_DIR" \
   REGISTRY_PATH_ENV="$registry_path" \
   PROJECT_IDS_ENV="$discovered_project_ids_csv" \
     node --input-type=module <<'NODE'
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const helperUrl = pathToFileURL(resolve(process.env.ROOT_DIR_ENV, "scripts/lib/upsert-project-registry.mjs")).href;
+const helperUrl = pathToFileURL(resolve(process.env.SCRIPT_DIR_ENV, "lib/upsert-project-registry.mjs")).href;
 const { pruneRegistryRecords } = await import(helperUrl);
 
 const removed = await pruneRegistryRecords({

@@ -17,6 +17,7 @@
   },
   "files": [
     "dist",
+    "dist-scripts",
     "deploy.example.yaml",
     "src/config/deploy.schema.json"
   ],
@@ -43,6 +44,7 @@
   },
   "scripts": {
     "build": "tsup src/index.ts src/cli.ts --format esm --dts --clean",
+    "prepack": "node scripts/copy-ops-scripts.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   }

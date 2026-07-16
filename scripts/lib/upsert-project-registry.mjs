@@ -12,12 +12,39 @@ function requireValue(flag, value) {
   return value;
 }
 
-export async function loadProjectRegistryStore(rootDir) {
-  const gatewayEntry = resolve(rootDir, "packages", "gateway", "dist", "index.js");
-  if (!existsSync(gatewayEntry)) {
-    throw new Error(`gateway dist not found at ${gatewayEntry}; run 'pnpm build' first`);
+/**
+ * Resolve an import specifier (file:// URL) for the gateway dist entry that
+ * exports ProjectRegistryStore.
+ *
+ * Order:
+ *   1. Installed package `@understand-anyway/gateway` via import.meta.resolve
+ *      (npm deploy layout; honors the package's ESM `exports`).
+ *   2. Monorepo `<rootDir>/packages/gateway/dist/index.js` (source checkout).
+ *
+ * `deps` is injectable for testing (metaResolve/exists).
+ */
+export function resolveGatewayEntry(rootDir, deps = {}) {
+  const metaResolve = deps.metaResolve
+    ?? ((spec) => import.meta.resolve(spec));
+  const exists = deps.exists ?? existsSync;
+  try {
+    const resolved = metaResolve("@understand-anyway/gateway");
+    if (resolved) return resolved;
+  } catch {
+    // fall through to source layout
   }
-  const mod = await import(pathToFileURL(gatewayEntry).href);
+  const sourceEntry = resolve(rootDir ?? process.cwd(), "packages", "gateway", "dist", "index.js");
+  if (exists(sourceEntry)) {
+    return pathToFileURL(sourceEntry).href;
+  }
+  throw new Error(
+    `gateway dist not found: install @understand-anyway/gateway or build ${sourceEntry}`,
+  );
+}
+
+export async function loadProjectRegistryStore(rootDir) {
+  const gatewayEntry = resolveGatewayEntry(rootDir);
+  const mod = await import(gatewayEntry);
   if (typeof mod.ProjectRegistryStore !== "function") {
     throw new Error(`gateway dist at ${gatewayEntry} does not export ProjectRegistryStore`);
   }

@@ -3,7 +3,8 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { normalizeAccessHost, pruneRegistryRecords, upsertProdRegistryRecord } from "../upsert-project-registry.mjs";
+import { pathToFileURL } from "node:url";
+import { normalizeAccessHost, pruneRegistryRecords, resolveGatewayEntry, upsertProdRegistryRecord } from "../upsert-project-registry.mjs";
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -102,6 +103,45 @@ try {
     removed.length === 1 && removed[0] === "stale" && records.has("alpha") && !records.has("stale"),
     JSON.stringify({ removed, records: Array.from(records.keys()) }),
   );
+
+  // resolveGatewayEntry: prefer installed @understand-anyway/gateway (npm
+  // layout), fall back to monorepo packages/gateway/dist (source checkout).
+  {
+    const npmEntry = "file:///pkg/node_modules/@understand-anyway/gateway/dist/index.js";
+    const resolvedNpm = resolveGatewayEntry("/any/root", {
+      metaResolve: (spec) => {
+        if (spec === "@understand-anyway/gateway") return npmEntry;
+        throw new Error("not found");
+      },
+      exists: () => true,
+    });
+    check("resolveGatewayEntry: prefers installed gateway", resolvedNpm === npmEntry, resolvedNpm);
+  }
+  {
+    const sourceEntry = pathToFileURL(resolve("/repo", "packages", "gateway", "dist", "index.js")).href;
+    const resolvedSrc = resolveGatewayEntry("/repo", {
+      metaResolve: () => {
+        throw new Error("Cannot find package '@understand-anyway/gateway'");
+      },
+      exists: (p) => p === resolve("/repo", "packages", "gateway", "dist", "index.js"),
+    });
+    check("resolveGatewayEntry: falls back to source dist", resolvedSrc === sourceEntry, resolvedSrc);
+  }
+  {
+    let threw = false;
+    try {
+      resolveGatewayEntry("/repo", {
+        metaResolve: () => {
+          throw new Error("nope");
+        },
+        exists: () => false,
+      });
+    } catch {
+      threw = true;
+    }
+    check("resolveGatewayEntry: throws when neither resolves", threw);
+  }
+
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

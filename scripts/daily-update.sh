@@ -243,7 +243,7 @@ if [[ -n "$profile" ]]; then nightly_args+=(--profile "$profile"); fi
 if [[ "$dry_run" == "true" ]]; then nightly_args+=(--dry-run); fi
 
 stage_begin
-run_step "nightly-project-sync" "$SCRIPT_DIR/nightly-project-sync.sh" "${nightly_args[@]+"${nightly_args[@]}"}"
+run_step "nightly-project-sync" bash "$SCRIPT_DIR/nightly-project-sync.sh" "${nightly_args[@]+"${nightly_args[@]}"}"
 nightly_status=$?
 stage_end "nightly-project-sync"
 if [[ "$nightly_status" -ne 0 ]]; then
@@ -269,7 +269,7 @@ if [[ -n "$resolved_plugin_root" ]]; then refresh_args+=(--plugin-root "$resolve
 if [[ "$dry_run" == "true" ]]; then refresh_args+=(--dry-run); fi
 
 stage_begin
-run_step "refresh-prod-server" "$SCRIPT_DIR/refresh-prod-server.sh" "${refresh_args[@]}"
+run_step "refresh-prod-server" bash "$SCRIPT_DIR/refresh-prod-server.sh" "${refresh_args[@]}"
 refresh_status=$?
 stage_end "refresh-prod-server"
 if [[ "$refresh_status" -ne 0 ]]; then

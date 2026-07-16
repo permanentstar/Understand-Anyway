@@ -26,6 +26,7 @@ import { runReviewGraphHealth } from "./review/run-graph-health-review.js";
 import { runReviewHookCli } from "./review/run-review-hook.js";
 import { runRepair } from "./repair/index.js";
 import { runNotify } from "./notify/index.js";
+import { runOpsScript } from "./ops/run-ops-script.js";
 import { loadResolvedConfig } from "./config/load.js";
 import { installParentSignalReaper } from "@understand-anyway/core";
 
@@ -35,6 +36,20 @@ import { installParentSignalReaper } from "@understand-anyway/core";
 export { CLI_ENTRY } from "./cli-entry.js";
 
 async function main(argv: string[]): Promise<void> {
+  // Ops orchestration passthrough. `ops <name> [args...]` runs a bundled shell
+  // script (daily-update / nightly-project-sync / refresh-prod-server) whose
+  // argv shape is deliberately outside the structured parser — args are
+  // forwarded verbatim to the script.
+  if (argv[0] === "ops") {
+    const name = argv[1] ?? "";
+    if (!name || name === "--help" || name === "-h") {
+      process.stdout.write("usage: understand-anyway ops <daily-update|nightly-project-sync|refresh-prod-server> [args...]\n");
+      process.exit(name ? 0 : 2);
+    }
+    const code = runOpsScript(name, argv.slice(2));
+    process.exit(code);
+  }
+
   // Hidden subcommand for the spawned worker. Handled before the public
   // parser so its argv shape (very different from `build`) stays isolated.
   if (argv[0] === "batch-mapper-worker") {

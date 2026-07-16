@@ -122,6 +122,32 @@ describe("runGateway publish", () => {
       rmSync(work, { recursive: true, force: true });
     }
   });
+
+  it("copies the flat npm node_modules tree for installed-cli releases", () => {
+    const work = mkdtempSync(resolve(tmpdir(), "ua-gateway-installed-npm-"));
+    try {
+      const installRoot = resolve(work, "install");
+      const nodeModules = resolve(installRoot, "node_modules");
+      const packageRoot = resolve(nodeModules, "@understand-anyway/cli");
+      const coreRoot = resolve(nodeModules, "@understand-anyway/core");
+      mkdirSync(resolve(packageRoot, "dist"), { recursive: true });
+      writeFileSync(resolve(packageRoot, "package.json"), JSON.stringify({ name: "@understand-anyway/cli" }), "utf8");
+      writeFileSync(resolve(packageRoot, "dist/cli.js"), 'import "@understand-anyway/core";\n', "utf8");
+
+      mkdirSync(resolve(coreRoot, "dist"), { recursive: true });
+      writeFileSync(resolve(coreRoot, "package.json"), JSON.stringify({ name: "@understand-anyway/core" }), "utf8");
+      writeFileSync(resolve(coreRoot, "dist/index.js"), "export {};\n", "utf8");
+
+      const releaseRoot = resolve(work, "release");
+      copyInstalledCliPackageRelease(packageRoot, releaseRoot);
+
+      expect(existsSync(resolve(releaseRoot, "dist/cli.js"))).toBe(true);
+      expect(existsSync(resolve(releaseRoot, "node_modules/@understand-anyway/core/package.json"))).toBe(true);
+      expect(existsSync(resolve(releaseRoot, "node_modules/@understand-anyway/cli/package.json"))).toBe(true);
+    } finally {
+      rmSync(work, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("runGateway gc", () => {
