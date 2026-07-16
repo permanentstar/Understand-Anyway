@@ -79,11 +79,14 @@ export class FeishuAuthProvider implements AuthProvider {
     const state = randomBytes(16).toString("hex");
     this.pendingStates.set(state, { createdAt: Date.now(), nextPath });
     const client = this.createClient({ requireSecret: false });
-    const redirectTo = client.authorizeURL({
+    const authorizeParams: Record<string, string> = {
       redirect_uri: this.callbackUrl(),
-      scope: this.options.scope || undefined,
       state,
-    });
+    };
+    if (this.options.scope) {
+      authorizeParams.scope = this.options.scope;
+    }
+    const redirectTo = client.authorizeURL(authorizeParams);
     return { redirectTo };
   }
 

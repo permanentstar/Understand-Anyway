@@ -133,15 +133,26 @@ export function copyInstalledCliPackageRelease(
 
   // npm/yarn flat layout: no `.pnpm` store. The CLI package lives at
   // <root>/node_modules/@understand-anyway/cli and its @understand-anyway/*
-  // dependencies are hoisted as siblings under the same node_modules root.
-  // Copy that whole flat node_modules into the release so the runtime cli.js
-  // can resolve its dependencies without the install prefix.
+  // dependencies are usually hoisted as siblings under the same node_modules
+  // root. On installs where npm chose the nested layout (npm 10+ under sudo
+  // sometimes does this) the siblings instead live at
+  // <root>/node_modules/@understand-anyway/cli/node_modules/@understand-anyway/*.
+  // Cover both by merging the nested tree on top of the flat one.
   if (!installedNodeModulesRoot) {
     const flatNodeModulesRoot = dirname(dirname(resolvedPackageRoot));
+    const releaseNodeModules = resolve(releaseRoot, "node_modules");
     if (basename(flatNodeModulesRoot) === "node_modules" && existsSync(flatNodeModulesRoot)) {
-      const releaseNodeModules = resolve(releaseRoot, "node_modules");
       rmSync(releaseNodeModules, { recursive: true, force: true });
       cpSync(flatNodeModulesRoot, releaseNodeModules, {
+        recursive: true,
+        force: true,
+        dereference: true,
+      });
+    }
+    const nestedNodeModules = resolve(resolvedPackageRoot, "node_modules");
+    if (existsSync(nestedNodeModules)) {
+      mkdirSync(releaseNodeModules, { recursive: true });
+      cpSync(nestedNodeModules, releaseNodeModules, {
         recursive: true,
         force: true,
         dereference: true,

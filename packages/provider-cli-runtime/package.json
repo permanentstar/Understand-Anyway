@@ -1,6 +1,6 @@
 {
   "name": "@understand-anyway/provider-cli-runtime",
-  "version": "0.0.1-next.6",
+  "version": "0.0.1-next.7",
   "description": "Node subprocess runtime helpers for CLI-backed provider packages in Understand-Anyway.",
   "license": "MIT",
   "type": "module",
