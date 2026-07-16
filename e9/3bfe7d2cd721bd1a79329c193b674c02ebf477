@@ -1,9 +1,30 @@
+packages/core/src/build/pipeline.test.ts
+  s_4dc68bee55133e::t_9033410aba2260 1027-1095,1100-1116
+  s_4dc68bee55133e::t_dc77f3fb3daf67 1096-1099
+  s_4dc68bee55133e::t_38d581be2fa375 823-826
+  s_4dc68bee55133e::t_899feac5377bba 1117-1118
+packages/core/src/build/pipeline.ts
+  s_4dc68bee55133e::t_ba933d76119168 611-633,640-661,680-681,946,948-953,955-969
+  s_4dc68bee55133e::t_c0015bdaef1661 682-692,970
+  s_4dc68bee55133e::t_275b09dc63b180 947,954,999
+  s_4dc68bee55133e::t_d6a7979c2a0320 634-639,662-679,971
+  s_4dc68bee55133e::t_6decc378acd649 972
 ---
 {
   "schema_version": "authorship/3.0.0",
   "git_ai_version": "1.6.10",
   "base_commit_sha": "e93bfe7d2cd721bd1a79329c193b674c02ebf477",
   "prompts": {},
+  "sessions": {
+    "s_4dc68bee55133e": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a50ab28caac80d00b3e8217",
+        "model": "gpt-5.5__max"
+      },
+      "human_author": "permanentstar <permanent.star@gmail.com>"
+    }
+  },
   "attestation_metadata": {},
   "remote_transcripts": {}
 }
