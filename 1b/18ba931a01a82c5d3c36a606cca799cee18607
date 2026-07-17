@@ -1,0 +1,26 @@
+packages/gateway/src/portal-render.test.ts
+  s_a59a8dcee95c4d::t_f6332c878f05e8 8-12,109-134
+  s_a59a8dcee95c4d::t_f509cab88684c9 135-138
+  s_a59a8dcee95c4d::t_710a2308942fd3 139-140
+packages/gateway/src/portal-styles.ts
+  s_a59a8dcee95c4d::t_2460d36a75e034 338-342
+  s_a59a8dcee95c4d::t_165e197c3d7f58 281-301,305-312,315-335
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "1b18ba931a01a82c5d3c36a606cca799cee18607",
+  "prompts": {},
+  "sessions": {
+    "s_a59a8dcee95c4d": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a565addf72d6ccd416e1502",
+        "model": "gpt-5.5__max"
+      },
+      "human_author": "permanentstar <permanent.star@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
