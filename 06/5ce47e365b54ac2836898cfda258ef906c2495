@@ -1,0 +1,286 @@
+packages/provider-trae-cli-v1/package.json
+  s_a59a8dcee95c4d::t_4c2fd83d64f69f 3 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a59ebac8ca7d4cf4c86efdb","tool_type":"agent","tool_id":"write_stdin","line_ranges":[{"Single":3}]}]}
+packages/gateway/package.json
+  s_a59a8dcee95c4d::t_4c2fd83d64f69f 3 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a59ebac8ca7d4cf4c86efdb","tool_type":"agent","tool_id":"write_stdin","line_ranges":[{"Single":3}]}]}
+packages/plugin-api/package.json
+  s_a59a8dcee95c4d::t_4c2fd83d64f69f 3 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a59ebac8ca7d4cf4c86efdb","tool_type":"agent","tool_id":"write_stdin","line_ranges":[{"Single":3}]}]}
+packages/provider-feishu-auth/package.json
+  s_a59a8dcee95c4d::t_4c2fd83d64f69f 3 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a59ebac8ca7d4cf4c86efdb","tool_type":"agent","tool_id":"write_stdin","line_ranges":[{"Single":3}]}]}
+packages/cli/package.json
+  s_a59a8dcee95c4d::t_4c2fd83d64f69f 3 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a59ebac8ca7d4cf4c86efdb","tool_type":"agent","tool_id":"write_stdin","line_ranges":[{"Single":3}]}]}
+packages/provider-lark-im-notify/package.json
+  s_a59a8dcee95c4d::t_4c2fd83d64f69f 3 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a59ebac8ca7d4cf4c86efdb","tool_type":"agent","tool_id":"write_stdin","line_ranges":[{"Single":3}]}]}
+packages/provider-trae-cli-v2/package.json
+  s_a59a8dcee95c4d::t_4c2fd83d64f69f 3 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a59ebac8ca7d4cf4c86efdb","tool_type":"agent","tool_id":"write_stdin","line_ranges":[{"Single":3}]}]}
+packages/provider-feishu-sheets/package.json
+  s_a59a8dcee95c4d::t_4c2fd83d64f69f 3 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a59ebac8ca7d4cf4c86efdb","tool_type":"agent","tool_id":"write_stdin","line_ranges":[{"Single":3}]}]}
+packages/core/package.json
+  s_a59a8dcee95c4d::t_4c2fd83d64f69f 3 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a59ebac8ca7d4cf4c86efdb","tool_type":"agent","tool_id":"write_stdin","line_ranges":[{"Single":3}]}]}
+packages/provider-cli-runtime/package.json
+  s_a59a8dcee95c4d::t_4c2fd83d64f69f 3 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a59ebac8ca7d4cf4c86efdb","tool_type":"agent","tool_id":"write_stdin","line_ranges":[{"Single":3}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "065ce47e365b54ac2836898cfda258ef906c2495",
+  "prompts": {},
+  "sessions": {
+    "s_a59a8dcee95c4d": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a565addf72d6ccd416e1502",
+        "model": "gpt-5.5__max",
+        "display_model_name": "GPT-5.5"
+      },
+      "human_author": "permanentstar <permanent.star@gmail.com>"
+    }
+  },
+  "attestation_metadata": {
+    "packages/cli/package.json": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_4c2fd83d64f69f",
+        "line_ranges": [
+          {
+            "Single": 3
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a59ebac8ca7d4cf4c86efdb",
+            "tool_type": "agent",
+            "tool_id": "write_stdin",
+            "line_ranges": [
+              {
+                "Single": 3
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "packages/core/package.json": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_4c2fd83d64f69f",
+        "line_ranges": [
+          {
+            "Single": 3
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a59ebac8ca7d4cf4c86efdb",
+            "tool_type": "agent",
+            "tool_id": "write_stdin",
+            "line_ranges": [
+              {
+                "Single": 3
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "packages/gateway/package.json": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_4c2fd83d64f69f",
+        "line_ranges": [
+          {
+            "Single": 3
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a59ebac8ca7d4cf4c86efdb",
+            "tool_type": "agent",
+            "tool_id": "write_stdin",
+            "line_ranges": [
+              {
+                "Single": 3
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "packages/plugin-api/package.json": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_4c2fd83d64f69f",
+        "line_ranges": [
+          {
+            "Single": 3
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a59ebac8ca7d4cf4c86efdb",
+            "tool_type": "agent",
+            "tool_id": "write_stdin",
+            "line_ranges": [
+              {
+                "Single": 3
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "packages/provider-cli-runtime/package.json": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_4c2fd83d64f69f",
+        "line_ranges": [
+          {
+            "Single": 3
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a59ebac8ca7d4cf4c86efdb",
+            "tool_type": "agent",
+            "tool_id": "write_stdin",
+            "line_ranges": [
+              {
+                "Single": 3
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "packages/provider-feishu-auth/package.json": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_4c2fd83d64f69f",
+        "line_ranges": [
+          {
+            "Single": 3
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a59ebac8ca7d4cf4c86efdb",
+            "tool_type": "agent",
+            "tool_id": "write_stdin",
+            "line_ranges": [
+              {
+                "Single": 3
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "packages/provider-feishu-sheets/package.json": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_4c2fd83d64f69f",
+        "line_ranges": [
+          {
+            "Single": 3
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a59ebac8ca7d4cf4c86efdb",
+            "tool_type": "agent",
+            "tool_id": "write_stdin",
+            "line_ranges": [
+              {
+                "Single": 3
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "packages/provider-lark-im-notify/package.json": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_4c2fd83d64f69f",
+        "line_ranges": [
+          {
+            "Single": 3
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a59ebac8ca7d4cf4c86efdb",
+            "tool_type": "agent",
+            "tool_id": "write_stdin",
+            "line_ranges": [
+              {
+                "Single": 3
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "packages/provider-trae-cli-v1/package.json": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_4c2fd83d64f69f",
+        "line_ranges": [
+          {
+            "Single": 3
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a59ebac8ca7d4cf4c86efdb",
+            "tool_type": "agent",
+            "tool_id": "write_stdin",
+            "line_ranges": [
+              {
+                "Single": 3
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "packages/provider-trae-cli-v2/package.json": [
+      {
+        "hash": "s_a59a8dcee95c4d::t_4c2fd83d64f69f",
+        "line_ranges": [
+          {
+            "Single": 3
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a59ebac8ca7d4cf4c86efdb",
+            "tool_type": "agent",
+            "tool_id": "write_stdin",
+            "line_ranges": [
+              {
+                "Single": 3
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "s_a59a8dcee95c4d": {
+      "tool": "trae",
+      "conversation_id": "6a565addf72d6ccd416e1502",
+      "session_id": "6a565addf72d6ccd416e1502",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_a59a8dcee95c4d::t_4c2fd83d64f69f": {
+      "tool": "trae",
+      "conversation_id": "6a565addf72d6ccd416e1502",
+      "session_id": "6a565addf72d6ccd416e1502",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
