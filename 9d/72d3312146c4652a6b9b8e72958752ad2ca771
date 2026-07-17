@@ -1,0 +1,200 @@
+packages/cli/src/batch-mapper-worker.test.ts
+  s_a59a8dcee95c4d::t_4c266dd79b4b4c 34,60,73,91-95,189,231
+packages/cli/src/args.test.ts
+  s_a59a8dcee95c4d::t_31cfcf8d410cda 292,298-302
+  s_a59a8dcee95c4d::t_9ddff94f486435 224-226,339,343-345,350-352,355,357-361
+README.zh-CN.md
+  s_a59a8dcee95c4d::t_d4b31bf5624db9 10-13
+docs/deployment-cli.md
+  s_a59a8dcee95c4d::t_1f8bab726286ea 73,80,326
+  s_a59a8dcee95c4d::t_969be3c53ca9a2 71-72,81-83,337
+  s_a59a8dcee95c4d::t_0947afe65af914 56-62
+  s_a59a8dcee95c4d::t_b66eae66baa5af 211-225
+packages/core/src/build/pipeline.ts
+  s_a59a8dcee95c4d::t_4ba779cf21be1d 475-476,524-525
+  s_a59a8dcee95c4d::t_f0808749d1cdbc 740-741,772-803,815-816,818,829
+  s_a59a8dcee95c4d::t_5c039c01eff518 999,1079
+  s_a59a8dcee95c4d::t_22d4b18c837366 110,519
+  s_a59a8dcee95c4d::t_496c6d85c08d2a 30,81-82
+  s_a59a8dcee95c4d::t_d279ccea4169f6 742-743,836-851
+  s_a59a8dcee95c4d::t_62cf7bb776076c 246-300
+  s_a59a8dcee95c4d::t_e84f6df1d7fa5c 549-562
+scripts/lib/time.mjs
+  s_a59a8dcee95c4d::t_7a2e8fc067ca9c 1-15
+packages/provider-feishu-sheets/src/index.ts
+  s_a59a8dcee95c4d::t_586526ce078f32 12-14
+  s_a59a8dcee95c4d::t_9c826ff37a93b9 5-7
+packages/cli/src/args.ts
+  s_a59a8dcee95c4d::t_7bdc83bcefdd99 424
+  s_a59a8dcee95c4d::t_28c01bedd63b5c 428
+  s_a59a8dcee95c4d::t_007999329b75bd 440-442
+  s_a59a8dcee95c4d::t_387e0fdb4dabf5 92-97,665-667,733-737,739-740,780-782
+packages/cli/src/build-record.ts
+  s_a59a8dcee95c4d::t_8d95db06a4bdc7 91,93
+  s_a59a8dcee95c4d::t_0cbb897084b923 8-10
+packages/cli/deploy.example.yaml
+  s_a59a8dcee95c4d::t_f56297e43482d4 80-81,87-91
+  s_a59a8dcee95c4d::t_059afb71001c8d 109-110,130-132
+  s_a59a8dcee95c4d::t_8ff663a8327495 68-70,93-94,111,129
+packages/cli/src/config/schema.test.ts
+  s_a59a8dcee95c4d::t_57433edee05327 159,162,210,212
+  s_a59a8dcee95c4d::t_fbd4e4769d3745 196-198,208,211
+README.md
+  s_a59a8dcee95c4d::t_31db8ff96b50ea 10-13
+scripts/release-gate-ppe.mjs
+  s_a59a8dcee95c4d::t_ba13eaf8d4c502 323-324
+  s_a59a8dcee95c4d::t_b4eb26727ee5dc 311,325
+scripts/aggregate-nightly.mjs
+  s_a59a8dcee95c4d::t_7d155b7fad639c 24,180
+packages/cli/src/build-config.ts
+  s_a59a8dcee95c4d::t_0b24a95bf77a90 29,43,205-207,219-220,223-224,241
+  s_a59a8dcee95c4d::t_6bfd3c7f784a0d 28,31,42,45,199-204,210-213,215-218,221-222,240,243
+scripts/__tests__/aggregate-nightly.test.mjs
+  s_a59a8dcee95c4d::t_ef6ec2acfd3cc5 142-143
+packages/cli/src/build-config.test.ts
+  s_a59a8dcee95c4d::t_d27139121ffda3 28-30,61-62,94,113-114,168,176-177,266,271,276,278,283-285,288,290,292,295,299,306,309,313-314,317,319,322,325-330,333,335
+  s_a59a8dcee95c4d::t_52f5f4bac408ba 63,95,161,163-167,169-172,175,302-305,307-308,310-312,315-316
+packages/core/src/build/checkpoint.test.ts
+  s_a59a8dcee95c4d::t_32bf10bf8c88c0 88-89
+  s_a59a8dcee95c4d::t_5f62ec6f5d59fc 4,54-87
+packages/core/src/build/batch-graph-segmented.ts
+  s_a59a8dcee95c4d::t_26a1e8f7d09d95 4-5,9,81,90,275-278,352,356
+packages/core/src/build/repair.ts
+  s_a59a8dcee95c4d::t_a04fc2a5a6d136 211
+packages/core/src/build/llm.test.ts
+  s_a59a8dcee95c4d::t_92e24ae096d715 375-400,421,428
+  s_a59a8dcee95c4d::t_c0b96ba472495c 430,454-455
+  s_a59a8dcee95c4d::t_73dc4fdf6cccfa 432,453
+  s_a59a8dcee95c4d::t_b544944e98cc8b 401-403
+  s_a59a8dcee95c4d::t_680ebc688df529 422-425,427,429,456-494
+  s_a59a8dcee95c4d::t_21c2248a17b7a0 404-420
+  s_a59a8dcee95c4d::t_7858bc1611c6bc 426
+  s_a59a8dcee95c4d::t_b9f96a79832f67 431
+packages/cli/src/build.test.ts
+  s_a59a8dcee95c4d::t_e644f3a1762db7 31-33,334-336,349-350
+  s_a59a8dcee95c4d::t_3e9bdb6fb5aad4 303-333,337-348,351-356
+packages/plugin-api/src/config.ts
+  s_a59a8dcee95c4d::t_b01cc9a8c1f717 29-30
+  s_a59a8dcee95c4d::t_8dd971e13d696e 27-28,33-34
+packages/gateway/src/portal-events.test.ts
+  s_a59a8dcee95c4d::t_cf668949a5d0f3 46-47
+  s_a59a8dcee95c4d::t_e8d09f775455bf 34-36,38,42-45
+scripts/__tests__/release-gate-ppe-verdaccio.test.mjs
+  s_a59a8dcee95c4d::t_a970fb995d453d 3,9-10,51
+scripts/__tests__/release.test.mjs
+  s_a59a8dcee95c4d::t_d4843a621af698 21,145-149,423-428
+  s_a59a8dcee95c4d::t_ea821dc0947bad 429
+scripts/__tests__/write-external-records.test.mjs
+  s_a59a8dcee95c4d::t_1c360b3f4da747 8
+  s_a59a8dcee95c4d::t_895fb997382f16 281-299
+packages/cli/src/build-llm.ts
+  s_a59a8dcee95c4d::t_0f92af00bf94af 52-62
+packages/gateway/src/portal-events.ts
+  s_a59a8dcee95c4d::t_9d8a87941f7d41 43-66,73-74,82,84-85
+scripts/lib/release-gate-helpers.mjs
+  s_a59a8dcee95c4d::t_230335a941c4e8 247-248
+  s_a59a8dcee95c4d::t_11c1f6ae6cc786 249
+scripts/deploy.ppe.yaml
+  s_a59a8dcee95c4d::t_0849d3029adf1c 61-62,77-79
+  s_a59a8dcee95c4d::t_bee58923f9c719 9-10,34-35,63
+packages/core/src/build/pipeline.test.ts
+  s_a59a8dcee95c4d::t_1a6102d27866d2 305
+  s_a59a8dcee95c4d::t_f4a5a55ede2c59 340-341
+  s_a59a8dcee95c4d::t_e8a062ae96f700 648-677,679-692,694-711,716-731
+  s_a59a8dcee95c4d::t_ef0def787d8c80 2-4,269-304,306-339
+  s_a59a8dcee95c4d::t_d02763c3c24f7e 693
+  s_a59a8dcee95c4d::t_d830e682f3a310 624,712-715
+  s_a59a8dcee95c4d::t_93f173dda56dc9 732-803
+  s_a59a8dcee95c4d::t_0c27da6d14dee5 678
+  s_a59a8dcee95c4d::t_e6c9c20ae3fd16 1349
+packages/gateway/src/portal-styles.ts
+  s_a59a8dcee95c4d::t_3eda8032003332 221
+  s_a59a8dcee95c4d::t_bde314e25e5a85 222
+  s_a59a8dcee95c4d::t_d1775f1655dab0 224
+  s_a59a8dcee95c4d::t_267fb313b082e8 223
+packages/gateway/src/portal-render.ts
+  s_a59a8dcee95c4d::t_7518538f4b99cb 177
+  s_a59a8dcee95c4d::t_b5631017ee0df7 153
+  s_a59a8dcee95c4d::t_b3b4dc90eac03d 152,154-156
+scripts/__tests__/aggregate-daily.test.mjs
+  s_a59a8dcee95c4d::t_6dbb958209a507 89-90
+packages/core/src/build/batch-graph-segmented.test.ts
+  s_a59a8dcee95c4d::t_c2d24c96d64039 135-136,149
+  s_a59a8dcee95c4d::t_1bfcdaf373530f 104,128,141,146,166,178,198,251,268,283
+  s_a59a8dcee95c4d::t_f29e8bfedcd15a 145
+scripts/release.mjs
+  s_a59a8dcee95c4d::t_367c5fed863c1c 134-137
+  s_a59a8dcee95c4d::t_2e853280cf7fca 550,552-554,560-562
+  s_a59a8dcee95c4d::t_74b7920cd9e539 457-460,511,513-514
+  s_a59a8dcee95c4d::t_c0129e2585f7cf 456,512,515
+  s_a59a8dcee95c4d::t_2ab3f4698ed915 26,38-40,44
+scripts/write-external-records.mjs
+  s_a59a8dcee95c4d::t_34cdaf157f4efd 276-279,281
+  s_a59a8dcee95c4d::t_5fe5f040a13afc 12,187,213
+  s_a59a8dcee95c4d::t_6e05e94581fc06 17,19,21,25-27,180,182,274,280,291-294,324-325
+packages/core/src/build/repair.test.ts
+  s_a59a8dcee95c4d::t_0f8e8cdd43ff6b 187,190,199
+packages/cli/scripts/__tests__/copy-ops-scripts.test.mjs
+  s_a59a8dcee95c4d::t_e1ec4f055f96b2 23,46
+packages/core/src/build/checkpoint.ts
+  s_a59a8dcee95c4d::t_cc9bf861a3d07f 44-48,77-81,86-93
+scripts/__tests__/release-gate-ppe.test.mjs
+  s_a59a8dcee95c4d::t_4060d432f1a443 4,11-12,82,84
+packages/provider-feishu-sheets/src/feishu-sheets-record-provider.ts
+  s_a59a8dcee95c4d::t_f05658c73389a1 11,13,21-26,30-39,43-126,188,213,225-263,268,275,280
+packages/core/src/build/llm.ts
+  s_a59a8dcee95c4d::t_619cbde92a2128 561,576-591,620-684,689-696,698
+  s_a59a8dcee95c4d::t_452b1e87501c58 529-560,562-575,592-619
+  s_a59a8dcee95c4d::t_2c241ddd17f674 740-768,828-844,858-859,861,863,865
+  s_a59a8dcee95c4d::t_63e324904f381a 67-70
+packages/cli/src/config/deploy.schema.json
+  s_a59a8dcee95c4d::t_2d58c38cb15ace 129
+  s_a59a8dcee95c4d::t_723d075ed0065f 128,134
+packages/provider-feishu-sheets/src/feishu-sheets-record-provider.test.ts
+  s_a59a8dcee95c4d::t_59e7dc1d5148fd 101-103
+  s_a59a8dcee95c4d::t_b7aebdf0712a78 77-100,104-137,336,338
+packages/core/src/fixture-regression.test.ts
+  s_a59a8dcee95c4d::t_5a3d68fa834e39 103
+packages/cli/src/build-record.test.ts
+  s_a59a8dcee95c4d::t_09b6396c11d675 84
+packages/cli/src/dashboard-prod/build-dashboard-dist.test.ts
+  s_a59a8dcee95c4d::t_9c66bb62a6c0f9 241
+  s_a59a8dcee95c4d::t_93c27d9b36f8e7 242-244
+packages/cli/src/build.ts
+  s_a59a8dcee95c4d::t_8cb1b9fbff37fd 165,173
+  s_a59a8dcee95c4d::t_286a91f13b09ad 22,59,66-67,121,164,166,181
+packages/gateway/src/portal-render.test.ts
+  s_a59a8dcee95c4d::t_c7c20662fd7bb3 71
+  s_a59a8dcee95c4d::t_26f475b270a5c8 63,74,95-98,110-115,126,129,131-134,136-138,140-141
+  s_a59a8dcee95c4d::t_971b544bc287c4 72
+  s_a59a8dcee95c4d::t_f509cab88684c9 139
+  s_a59a8dcee95c4d::t_114de4477865c8 70
+  s_a59a8dcee95c4d::t_3ff50fc66fd881 73
+  s_a59a8dcee95c4d::t_a963db413754ff 68
+  s_a59a8dcee95c4d::t_f6332c878f05e8 8-12,116-125,127-128,130,135
+  s_a59a8dcee95c4d::t_691b9d6a40acdd 75,99-109
+scripts/aggregate-daily.mjs
+  s_a59a8dcee95c4d::t_d2a9289d1de72e 28,158
+packages/cli/src/batch-mapper-worker.ts
+  s_a59a8dcee95c4d::t_63cbd9c10be106 34,77,141-142,189,310
+packages/cli/scripts/copy-ops-scripts.mjs
+  s_a59a8dcee95c4d::t_be4dcca2ab808a 21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "9d72d3312146c4652a6b9b8e72958752ad2ca771",
+  "prompts": {},
+  "sessions": {
+    "s_a59a8dcee95c4d": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a565addf72d6ccd416e1502",
+        "model": "gpt-5.5__max"
+      },
+      "human_author": "permanentstar <permanent.star@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
