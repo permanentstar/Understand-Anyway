@@ -139,6 +139,8 @@ function runScript(args) {
     check("empty: projectCount=0", payload.projectCount === 0, JSON.stringify(payload));
     check("empty: overallStatus=success", payload.overallStatus === "success", JSON.stringify(payload));
     check("empty: projects=[]", Array.isArray(payload.projects) && payload.projects.length === 0, JSON.stringify(payload));
+    check("empty: startedAt uses local timezone offset", /^[0-9T:.+-]+[+-]\d{2}:\d{2}$/.test(payload.startedAt), payload.startedAt);
+    check("empty: finishedAt uses local timezone offset", /^[0-9T:.+-]+[+-]\d{2}:\d{2}$/.test(payload.finishedAt), payload.finishedAt);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

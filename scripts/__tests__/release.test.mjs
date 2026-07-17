@@ -18,6 +18,7 @@ import {
   publishCommands,
   pushCommand,
   readLockstepVersion,
+  shouldCreateGitTag,
   shouldRunPublicNpmWhoami,
   validateReleaseOptions,
 } from "../release.mjs";
@@ -141,6 +142,11 @@ test("parseFullVersion parses core and prerelease shapes", () => {
   assert.equal(parseFullVersion("bad"), null);
   assert.equal(parseFullVersion("0.0.1-01bad.0"), null);
 });
+test("shouldCreateGitTag only tags formal release versions", () => {
+  assert.equal(shouldCreateGitTag("0.0.2"), true);
+  assert.equal(shouldCreateGitTag("0.0.2-next.7"), false);
+});
+
 
 test("TAG_RE matches legal npm dist-tag / prerelease tag names", () => {
   assert.equal(TAG_RE.test("next"), true);
@@ -412,6 +418,13 @@ test("publish failure recovery message does not suggest rerunning the release bu
   assert.match(message, /missing packages/);
   assert.match(message, /git push origin main --follow-tags/);
   assert.doesNotMatch(message, new RegExp(["retry", "from", "this", "commit"].join(" ")));
+});
+
+test("publish failure recovery message does not mention local tag for prereleases", () => {
+  const message = publishFailureRecoveryMessage("0.0.2-next.7", PUBLIC_NPM_REGISTRY);
+  assert.match(message, /local release commit/);
+  assert.doesNotMatch(message, /local commit\/tag/);
+  assert.doesNotMatch(message, /delete the local tag/);
 });
 
 // --- registry preflight ---

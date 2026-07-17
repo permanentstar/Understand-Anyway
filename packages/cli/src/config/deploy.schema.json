@@ -124,17 +124,14 @@
         },
         "llmAnalysis": { "type": "boolean" },
         "llmRequired": { "type": "boolean" },
-        "llmModelCandidates": {
-          "type": "array",
-          "items": { "type": "string", "minLength": 1 }
-        },
         "llmRetry": { "$ref": "#/definitions/llmRetry" },
+        "llmConcurrencyPerMapper": { "type": "integer", "minimum": 1 },
+        "llmQpmLimit": { "type": "integer", "minimum": 1 },
         "batchMode": {
           "type": "string",
           "enum": ["auto", "full", "segmented"]
         },
-        "mapperBatchCount": { "type": "integer", "minimum": 1 },
-        "mapperConcurrency": { "type": "integer", "minimum": 1 }
+        "mappers": { "type": "integer", "minimum": 1 }
       }
     },
     "llmRetry": {

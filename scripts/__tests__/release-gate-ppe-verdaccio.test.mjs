@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const script = resolve(repoRoot, "scripts", "release-gate-ppe-verdaccio.mjs");
+const packageVersion = JSON.parse(readFileSync(resolve(repoRoot, "packages", "cli", "package.json"), "utf8")).version;
+const escapedVersion = packageVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 function run(args, env = {}) {
   return spawnSync(process.execPath, [script, ...args], {
@@ -45,7 +48,7 @@ function run(args, env = {}) {
   assert.match(r.stdout, /scp/);
   assert.match(r.stdout, /npm publish/);
   assert.match(r.stdout, /ssh -n -o BatchMode=yes/);
-  assert.match(r.stdout, /understand-anyway-cli-0\.0\.1-next\.8\.tgz/);
+  assert.match(r.stdout, new RegExp(`understand-anyway-cli-${escapedVersion}\\.tgz`));
   assert.doesNotMatch(r.stdout, /understand-anyway-cli\.tgz/);
   assert.match(r.stdout, /rm -rf .*verdaccio-tarballs/);
 

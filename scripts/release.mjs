@@ -23,7 +23,7 @@
 // the tool refuses to promote a prerelease to `latest` to avoid clobbering
 // the semver-compliant "latest = stable" contract.
 //
-// Execution order (chosen for recoverability: commit/tag locally before the
+// Execution order (chosen for recoverability: commit locally before the
 // irreversible npm publish, push to the remote only after npm succeeds):
 //   1. Sanity: valid bump, workspace packages in lockstep, clean tree for real
 //      execution, on `main` and synced with `origin/main` (unless --skip-git),
@@ -35,12 +35,13 @@
 //   5. `pnpm -r build`. Abort before publish if any package fails to build.
 //   6. `pnpm --filter <pkg> publish --dry-run --tag <dist-tag>` in dependency
 //      order. Abort before commit/tag on pack failures.
-//   7. `git commit -am "chore(release): v<next> (--tag <dist-tag>)"` +
-//      annotated `git tag` whose message records the dist-tag.
+//   7. `git commit -am "chore(release): v<next> (--tag <dist-tag>)"`.
+//      Core releases also create an annotated `git tag`; prereleases do not,
+//      so the repository tag list only contains formal release versions.
 //   8. `pnpm --filter <pkg> publish --access public --no-git-checks --tag
 //      <dist-tag>` in the same dependency order.
 //   9. `git push origin main --follow-tags`. If this fails, retry the same
-//      push command; the npm package already matches the local commit and tag.
+//      push command; the npm package already matches the local commit.
 //
 // `--dry-run` prints the full plan (rewrite targets + shell commands) and
 // exits before mutating anything. Public releases always pin
@@ -128,6 +129,10 @@ function normalizeCompareOperand(value) {
 export function isPrereleaseVersion(version) {
   const parsed = parseFullVersion(version);
   return parsed !== null && parsed.prerelease !== null;
+}
+
+export function shouldCreateGitTag(version) {
+  return !isPrereleaseVersion(version);
 }
 
 export function bumpVersion(current, level, tag) {
@@ -448,7 +453,11 @@ if (isMain) {
     `3. run: pnpm install --lockfile-only`,
     `4. run: pnpm -r build`,
       skipPublish ? `5. [skipped] package publish dry-runs` : `5. run in order:\n${formatCommandList(publishCommands(registry, { tag, dryRun: true }), "       ")}`,
-    skipGit ? `6. [skipped] git commit + annotated tag` : `6. run: git commit -am "chore(release): v${next} (--tag ${tag})" && git tag -a v${next} -m "v${next} (--tag ${tag})"`,
+    skipGit
+      ? `6. [skipped] git commit${shouldCreateGitTag(next) ? " + annotated tag" : ""}`
+      : shouldCreateGitTag(next)
+        ? `6. run: git commit -am "chore(release): v${next} (--tag ${tag})" && git tag -a v${next} -m "v${next} (--tag ${tag})"`
+        : `6. run: git commit -am "chore(release): v${next} (--tag ${tag})" (no git tag for prerelease)`,
       skipPublish ? `7. [skipped] package publish` : `7. run in order:\n${formatCommandList(publishCommands(registry, { tag }), "       ")}`,
     skipGit ? `8. [skipped] git push origin main --follow-tags` : `8. run: ${formatCmd(pushCommand())}`,
   ];
@@ -499,7 +508,11 @@ if (isMain) {
 
   if (!skipGit) {
     run(["git", "commit", "-am", `chore(release): v${next} (--tag ${tag})`]);
-    run(["git", "tag", "-a", `v${next}`, "-m", `v${next} (--tag ${tag})`]);
+    if (shouldCreateGitTag(next)) {
+      run(["git", "tag", "-a", `v${next}`, "-m", `v${next} (--tag ${tag})`]);
+    } else {
+      process.stdout.write("release: prerelease build; not creating a git tag\n");
+    }
   } else {
     process.stdout.write("release: --skip-git, not committing / tagging\n");
   }
@@ -534,14 +547,19 @@ if (isMain) {
 }
 
 export function publishFailureRecoveryMessage(version, registry) {
+  const releaseTagCreated = !isPrereleaseVersion(version);
   return [
-    `release: publish failed after local commit/tag v${version} were created, but before any git push.`,
+    releaseTagCreated
+      ? `release: publish failed after local commit/tag v${version} were created, but before any git push.`
+      : `release: publish failed after local release commit v${version} was created, but before any git push.`,
     `release: Do not rerun release.mjs for v${version}; the version bump will reject or advance the already-bumped version.`,
     "release: Recovery: inspect which packages are already published, publish only missing packages from this commit, then push:",
     `release:   npm view <pkg> versions --json --registry ${registry}`,
       `release:   pnpm publish packages/<pkg-dir> --access public --no-git-checks --registry ${registry}`,
     "release:   git push origin main --follow-tags",
-    "release: If no package was published, delete the local tag/commit before another release attempt.",
+    releaseTagCreated
+      ? "release: If no package was published, delete the local tag/commit before another release attempt."
+      : "release: If no package was published, delete the local commit before another release attempt.",
     "",
   ].join("\n");
 }

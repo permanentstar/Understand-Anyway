@@ -9,7 +9,6 @@
 import type { ResolvedConfig } from "@understand-anyway/plugin-api";
 import {
   DEFAULT_RETRY_POLICY,
-  defaultMapperBatchCountForHost,
   defaultMapperConcurrencyForHost,
   readHostMetrics,
   type HostMetricsDeps,
@@ -25,11 +24,11 @@ export interface ResolvedBuildOptions {
   outputLanguage: string;
   llmAnalysis: boolean;
   llmRequired: boolean;
-  llmModelCandidates: string[];
   llmRetryPolicy: RetryPolicy;
+  llmConcurrencyPerMapper: number;
+  llmQpmLimit: number;
   batchMode: BatchMode;
-  mapperBatchCount: number;
-  mapperConcurrency: number;
+  mappers: number;
 }
 
 interface BuildSection {
@@ -39,11 +38,11 @@ interface BuildSection {
   pluginRoot?: string;
   llmAnalysis?: boolean;
   llmRequired?: boolean;
-  llmModelCandidates?: unknown;
   llmRetry?: LlmRetrySection;
+  llmConcurrencyPerMapper?: unknown;
+  llmQpmLimit?: unknown;
   batchMode?: unknown;
-  mapperBatchCount?: unknown;
-  mapperConcurrency?: unknown;
+  mappers?: unknown;
 }
 
 interface LlmRetrySection {
@@ -173,14 +172,6 @@ function batchModeFromYaml(value: unknown, path: string): BatchMode | undefined 
   throw new ArgsError(`invalid ${path}: ${String(value)}`);
 }
 
-function stringArrayFromYaml(value: unknown, path: string): string[] | undefined {
-  if (value === undefined) return undefined;
-  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string")) {
-    throw new ArgsError(`invalid ${path}: expected string[]`);
-  }
-  return value.map((entry) => entry.trim()).filter(Boolean);
-}
-
 export function resolveBuildConfig(
   args: BuildArgs,
   config: ResolvedConfig,
@@ -205,24 +196,32 @@ export function resolveBuildConfig(
     ?? batchModeFromYaml(baseBuild?.batchMode, "deploy.build.batchMode")
     ?? "auto";
 
-  const yamlMapperBatchCount =
-    intFromYaml(profileBuild?.mapperBatchCount, `${profileBuildPath}.mapperBatchCount`, { min: 1 })
-    ?? intFromYaml(baseBuild?.mapperBatchCount, "deploy.build.mapperBatchCount", { min: 1 });
-  const yamlMapperConcurrency =
-    intFromYaml(profileBuild?.mapperConcurrency, `${profileBuildPath}.mapperConcurrency`, { min: 1 })
-    ?? intFromYaml(baseBuild?.mapperConcurrency, "deploy.build.mapperConcurrency", { min: 1 });
+  const yamlMappers =
+    intFromYaml(profileBuild?.mappers, `${profileBuildPath}.mappers`, { min: 1 })
+    ?? intFromYaml(baseBuild?.mappers, "deploy.build.mappers", { min: 1 });
+  const yamlLlmConcurrencyPerMapper =
+    intFromYaml(profileBuild?.llmConcurrencyPerMapper, `${profileBuildPath}.llmConcurrencyPerMapper`, { min: 1 })
+    ?? intFromYaml(baseBuild?.llmConcurrencyPerMapper, "deploy.build.llmConcurrencyPerMapper", { min: 1 });
+  const yamlLlmQpmLimit =
+    intFromYaml(profileBuild?.llmQpmLimit, `${profileBuildPath}.llmQpmLimit`, { min: 1 })
+    ?? intFromYaml(baseBuild?.llmQpmLimit, "deploy.build.llmQpmLimit", { min: 1 });
 
   const metrics = readHostMetrics(deps.hostMetrics ?? {});
-  const mapperBatchCount =
-    args.mapperBatchCount
-    ?? readEnvInt(env, "UA_MAPPER_BATCH_COUNT", { min: 1 })
-    ?? yamlMapperBatchCount
-    ?? defaultMapperBatchCountForHost(metrics);
-  const mapperConcurrency =
-    args.mapperConcurrency
-    ?? readEnvInt(env, "UA_MAPPER_CONCURRENCY", { min: 1 })
-    ?? yamlMapperConcurrency
+  const mappers =
+    args.mappers
+    ?? readEnvInt(env, "UA_MAPPERS", { min: 1 })
+    ?? yamlMappers
     ?? defaultMapperConcurrencyForHost(metrics);
+  const llmConcurrencyPerMapper =
+    args.llmConcurrencyPerMapper
+    ?? readEnvInt(env, "UA_LLM_CONCURRENCY_PER_MAPPER", { min: 1 })
+    ?? yamlLlmConcurrencyPerMapper
+    ?? 1;
+  const llmQpmLimit =
+    args.llmQpmLimit
+    ?? readEnvInt(env, "UA_LLM_QPM_LIMIT", { min: 1 })
+    ?? yamlLlmQpmLimit
+    ?? 1;
 
   return {
     mode: args.mode !== "full" ? args.mode : envModeOverride ?? configuredMode ?? "full",
@@ -237,14 +236,10 @@ export function resolveBuildConfig(
       ?? "en",
     llmAnalysis: args.llmAnalysis ?? profileBuild?.llmAnalysis ?? baseBuild?.llmAnalysis ?? false,
     llmRequired: args.llmRequired ?? profileBuild?.llmRequired ?? baseBuild?.llmRequired ?? false,
-    llmModelCandidates: args.llmModelCandidates.length > 0
-      ? args.llmModelCandidates
-      : stringArrayFromYaml(profileBuild?.llmModelCandidates, `${profileBuildPath}.llmModelCandidates`)
-        ?? stringArrayFromYaml(baseBuild?.llmModelCandidates, "deploy.build.llmModelCandidates")
-        ?? [],
     llmRetryPolicy: resolveLlmRetryPolicy(args, profileBuild, baseBuild, env, profileBuildPath),
+    llmConcurrencyPerMapper,
+    llmQpmLimit,
     batchMode,
-    mapperBatchCount,
-    mapperConcurrency,
+    mappers,
   };
 }

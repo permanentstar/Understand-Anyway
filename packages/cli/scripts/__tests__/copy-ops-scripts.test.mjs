@@ -20,6 +20,7 @@ try {
   writeFileSync(resolve(repoScripts, "lib", "common.sh"), "# common\n");
   writeFileSync(resolve(repoScripts, "lib", "discover-projects.mjs"), "export const d = 1;\n");
   writeFileSync(resolve(repoScripts, "lib", "upsert-project-registry.mjs"), "export const u = 1;\n");
+  writeFileSync(resolve(repoScripts, "lib", "time.mjs"), "export const t = 1;\n");
   // Files that must NOT be published into the CLI package:
   writeFileSync(resolve(repoScripts, "lib", "release-gate-helpers.mjs"), "export const g = 1;\n");
   writeFileSync(resolve(repoScripts, "lib", "__tests__", "discover-projects.test.mjs"), "// test\n");
@@ -42,6 +43,7 @@ try {
     "write-external-records.mjs",
     "lib/common.sh",
     "lib/discover-projects.mjs",
+    "lib/time.mjs",
     "lib/upsert-project-registry.mjs",
   ];
   for (const f of mustExist) {

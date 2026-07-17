@@ -18,6 +18,7 @@ const FILES = [
   "write-external-records.mjs",
   "lib/common.sh",
   "lib/discover-projects.mjs",
+  "lib/time.mjs",
   "lib/upsert-project-registry.mjs",
 ];
 

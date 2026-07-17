@@ -21,6 +21,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, renameSync } from "node:fs";
 import { resolve, dirname } from "node:path";
+import { formatLocalTimestamp } from "./lib/time.mjs";
 
 function parseArgs(argv) {
   const args = {
@@ -176,7 +177,7 @@ function atomicWrite(path, contents) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
-  const now = new Date().toISOString();
+  const now = formatLocalTimestamp();
   const operationsRoot = resolve(args.projectsRoot, "gateway", "operations");
 
   const projects = args.projects.map((projectId) =>

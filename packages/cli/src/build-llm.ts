@@ -49,6 +49,17 @@ export function resolveLlmProfile(config: ResolvedConfig, profileName: string): 
   };
 }
 
+export function resolveProviderModelCandidates(config: ResolvedConfig): string[] {
+  const providerConfig = config.providers?.llm?.config;
+  if (!providerConfig || typeof providerConfig !== "object") return [];
+  const raw = (providerConfig as { modelCandidates?: unknown }).modelCandidates;
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw) || raw.some((entry) => typeof entry !== "string")) {
+    throw new ArgsError("invalid providers.llm.config.modelCandidates: expected string[]");
+  }
+  return raw.map((entry) => entry.trim()).filter(Boolean);
+}
+
 export async function buildLlmProvider(options: BuildLlmProviderOptions): Promise<LlmProvider | undefined> {
   if (!options.enabled) return undefined;
 

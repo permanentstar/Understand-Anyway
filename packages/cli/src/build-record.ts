@@ -5,9 +5,9 @@
  * returns `undefined` and the gateway falls back to NoopRecordProvider. The
  * local NDJSON sink is dependency-free; the Feishu Sheets sink is opt-in and
  * loaded lazily via dynamic import so users who never enable it don't pay
- * the install / load cost. `record.config.feishu-sheets` drives all of its
- * options (token/mappings never live in the repo — only `{{ }}` placeholders,
- * resolved before this runs).
+ * the install / load cost. `record.config.feishu-sheets` drives its runtime
+ * options; the provider owns standard worksheet headers so deployments only
+ * need token/worksheet wiring by default.
  *
  * The effective provider list is `--record-provider` when given, else
  * `record.providers` from the config (layer 1 flag override of layers 3/4).
@@ -88,9 +88,9 @@ async function buildOne(
     });
   }
   const sheets = config["feishu-sheets"] as FeishuSheetsRecordConfig | undefined;
-  if (!sheets || !sheets.spreadsheetToken || !sheets.mappings) {
+  if (!sheets || !sheets.spreadsheetToken) {
     throw new ArgsError(
-      "record provider 'feishu-sheets' requires config record.config.feishu-sheets.spreadsheetToken and .mappings",
+      "record provider 'feishu-sheets' requires config record.config.feishu-sheets.spreadsheetToken",
     );
   }
   const FeishuSheetsRecordProvider = await loadFeishuSheetsProvider();

@@ -1,12 +1,12 @@
 /**
  * Parent-process scheduler for the segmented mapper (C7).
  *
- * Splits the missing batch indexes into `mapperBatchCount`-sized segments,
- * runs up to `mapperConcurrency` workers in parallel, and validates each
+ * Splits the missing batch indexes into enough segments to fill the configured
+ * mapper slots, and validates each
  * segment's artefacts on disk before considering it successful.
  *
  * Capability coverage (plan §2):
- *   #1  mapperBatchCount / mapperConcurrency knobs (from caller)
+ *   #1  mappers knob + auto segment sizing (from caller)
  *   #3  spawn child workers via the batch-mapper-worker subcommand
  *   #4  file-based hand-off of batch indexes (batch-indexes-<s>-<e>.txt)
  *   #5  "exit 0 but products incomplete = failure" judgement
@@ -78,8 +78,7 @@ export interface SegmentedScheduleOptions {
   llm?: SegmentedLlmConfig;
   /** Plugin root override (worker uses it via env). */
   pluginRoot?: string | null;
-  mapperBatchCount: number;
-  mapperConcurrency: number;
+  mappers: number;
   /** Status / progress sink. Tests inject a no-op log. */
   log: (line: string) => void;
 }
@@ -88,6 +87,7 @@ export interface SegmentedScheduleResult {
   segments: number;
   missing: number;
   written: number;
+  mapperBatchCount?: number;
   /** Map of slot index -> assigned budget; absent when LLM is off. */
   slotBudgets?: LlmBudgetSlot[];
 }
@@ -272,8 +272,10 @@ export async function writeBatchGraphFilesSegmented(
     return { segments: 0, missing: 0, written: 0 };
   }
 
-  const segments = chunk(missingIndexes, options.mapperBatchCount);
-  const slots = workerSlotsFor(missingIndexes.length, options.mapperConcurrency, options.llm);
+  const slots = workerSlotsFor(missingIndexes.length, options.mappers, options.llm);
+  const mapperBatchCount = Math.max(1, Math.ceil(missingIndexes.length / slots));
+  const segments = chunk(missingIndexes, mapperBatchCount);
+  options.log(`[mapper] auto mapperBatchCount=${mapperBatchCount} for missing=${missingIndexes.length}, slots=${slots}`);
   const slotBudgets = options.llm?.enabled
     ? splitLlmBudgetForMapperSlots(
         { globalConcurrency: options.llm.globalConcurrency, qpmLimit: options.llm.qpmLimit },
@@ -347,9 +349,9 @@ export async function writeBatchGraphFilesSegmented(
   appendMetricsEvent(
     options.intermediateDir,
     BATCH_MAPPER_METRICS_FILE,
-    { type: SCHEDULER_EVENT_TYPE, status: "success", segments: segments.length, missing: missingIndexes.length, written },
+    { type: SCHEDULER_EVENT_TYPE, status: "success", segments: segments.length, missing: missingIndexes.length, written, mapperBatchCount },
     deps,
   );
 
-  return { segments: segments.length, missing: missingIndexes.length, written, slotBudgets };
+  return { segments: segments.length, missing: missingIndexes.length, written, mapperBatchCount, slotBudgets };
 }

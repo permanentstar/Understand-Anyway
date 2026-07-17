@@ -5,7 +5,7 @@
 // write-external-records.mjs with a mock Feishu Sheets client and assert
 // (a) each configured column has a value in the appended row, so no field name
 //     silently drifts from the payload keys, and
-// (b) a blank sheet still initializes its header from the configured columns.
+// (b) a blank sheet still initializes its header from provider defaults.
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -237,10 +237,6 @@ async function run() {
       appId: "{{ LARK_APP_ID }}"
       appSecret: "{{ LARK_APP_SECRET }}"
       spreadsheetToken: "DEPLOY_TOKEN"
-      mappings:
-        nightly-update:
-          worksheet: "nightly-update"
-          columns: ["runId"]
 `);
       process.env.HOME = work;
       process.env.UA_PROJECTS_ROOT = work;
@@ -269,10 +265,6 @@ async function run() {
     appSecret: "secret_test",
     spreadsheetToken: "shtTest",
     fetchImpl: makeCollectingFetch(calls),
-    mappings: {
-      "nightly-update": { worksheet: "nightly-update", columns: NIGHTLY_COLUMNS },
-      "project-update": { worksheet: "project-update", columns: PROJECT_COLUMNS },
-    },
   });
 
   check(
@@ -285,6 +277,25 @@ async function run() {
     JSON.stringify(PROJECT_COLUMNS) === JSON.stringify(EXPECTED_PROJECT_COLUMNS),
     JSON.stringify(PROJECT_COLUMNS),
   );
+
+  const localTimestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}$/;
+  {
+    const fallbackNightly = buildNightlyEnvelope({ runId: "fallback" });
+    check(
+      "nightly envelope fallback timestamp uses local timezone offset",
+      localTimestampPattern.test(fallbackNightly.timestamp),
+      fallbackNightly.timestamp,
+    );
+    const fallbackProject = buildProjectEnvelopes({
+      runId: "fallback",
+      projects: [{ projectName: "sample", overallStatus: "success" }],
+    })[0];
+    check(
+      "project envelope fallback timestamp uses local timezone offset",
+      fallbackProject && localTimestampPattern.test(fallbackProject.timestamp),
+      fallbackProject?.timestamp,
+    );
+  }
 
   await provider.write(buildNightlyEnvelope(aggregateFixture));
   for (const envelope of buildProjectEnvelopes(aggregateFixture)) {

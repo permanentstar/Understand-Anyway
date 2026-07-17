@@ -40,13 +40,38 @@ function headerString(value: string | string[] | undefined): string {
   return value ?? "";
 }
 
+function pad(value: number, width = 2): string {
+  return String(Math.trunc(Math.abs(value))).padStart(width, "0");
+}
+
+function formatLocalTimestamp(date = new Date()): string {
+  const offsetMinutes = -date.getTimezoneOffset();
+  const offsetSign = offsetMinutes >= 0 ? "+" : "-";
+  const offsetHours = pad(Math.floor(Math.abs(offsetMinutes) / 60));
+  const offsetRemainderMinutes = pad(Math.abs(offsetMinutes) % 60);
+  return [
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`,
+    `${offsetSign}${offsetHours}:${offsetRemainderMinutes}`,
+  ].join("");
+}
+
+function anonymousUserId(sourceIp: string): string {
+  return sourceIp ? `anonymous:${sourceIp}` : "anonymous";
+}
+
+function anonymousDisplayName(sourceIp: string): string {
+  return sourceIp ? `anonymous@${sourceIp}` : "anonymous";
+}
+
 export function buildUserEventPayload(
   session: AuthSession | null | undefined,
   req: IncomingMessage,
   input: PortalEventInput,
 ): RecordEnvelope {
   const user = session?.user;
-  const timestamp = new Date().toISOString();
+  const sourceIp = extractClientIp(req);
+  const timestamp = formatLocalTimestamp();
   return {
     kind: "user-event",
     timestamp,
@@ -54,10 +79,10 @@ export function buildUserEventPayload(
       eventId: randomUUID(),
       eventTime: timestamp,
       eventType: input.eventType,
-      userId: user?.id ?? "",
+      userId: user ? user.id : anonymousUserId(sourceIp),
       email: user?.email ?? "",
-      displayName: user?.displayName ?? "",
-      sourceIp: extractClientIp(req),
+      displayName: user ? (user.displayName ?? "") : anonymousDisplayName(sourceIp),
+      sourceIp,
       userAgent: headerString(req.headers["user-agent"]),
       targetType: input.targetType ?? "",
       targetId: input.targetId ?? "",

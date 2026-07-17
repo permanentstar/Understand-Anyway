@@ -308,6 +308,7 @@ function buildOssReleaseCommand(env, workRoot) {
     "      command: \"traex\"",
     "      args: [\"exec\", \"--skip-git-repo-check\", \"--dangerously-bypass-approvals-and-sandbox\", \"--ephemeral\"]",
     "      modelArg: \"-m\"",
+    "      modelCandidates: [\"Qwen3.6-Plus\"]",
     "      promptMode: \"arg\"",
     "record:",
     "  providers: [\"local\"]",
@@ -319,7 +320,9 @@ function buildOssReleaseCommand(env, workRoot) {
     "      outputLanguage: \"en\"",
     "      llmAnalysis: true",
     "      llmRequired: false",
-    "      llmModelCandidates: [\"small\"]",
+    "      mappers: 1",
+    "      llmConcurrencyPerMapper: 1",
+    "      llmQpmLimit: 2",
     "",
   ].join("\n");
   const encodedYaml = Buffer.from(deployYaml, "utf8").toString("base64");

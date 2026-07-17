@@ -239,6 +239,10 @@ const STUB_SOURCES = new Map<string, string>([
     "  const path = `/${fileName}`;\n  return token ? `${path}?token=${encodeURIComponent(token)}` : path;\n",
   ],
   [
+    "CodeViewer.tsx",
+    "  return `/file-content.json?${params.toString()}`;\n",
+  ],
+  [
     "SearchBar.tsx",
     "" +
       'import { useCallback, useEffect, useMemo, useRef, useState } from "react";\n' +

@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { runBuildMode, runFullBuild, runResumeBuild } from "./pipeline.js";
 import { GRAPH_VERSION } from "./wrap.js";
 
@@ -261,6 +264,79 @@ describe("runFullBuild (orchestration)", () => {
     expect(writes[journalPath]).toContain("\"scope\":\"file\"");
     const promptPath = "/repo/.understand-anything/llm/prompts/01-file-analysis-src_a.ts.txt";
     expect(writes[promptPath]).toBe("file prompt");
+  });
+
+  it("uses configured LLM budget for segmented mapper slots", async () => {
+    const root = mkdtempSync(join(tmpdir(), "ua-pipeline-"));
+    try {
+      const { core } = makeCore();
+      const cliEntry = join(root, "worker.js");
+      writeFileSync(cliEntry, "process.exit(0);\n");
+      const scanResult = {
+        files: [
+          { path: "src/a.ts", fileCategory: "code", language: "ts" },
+          { path: "src/b.ts", fileCategory: "code", language: "ts" },
+          { path: "src/c.ts", fileCategory: "code", language: "ts" },
+          { path: "src/d.ts", fileCategory: "code", language: "ts" },
+        ],
+        totalFiles: 4,
+        stats: { byLanguage: { ts: 4 } },
+      };
+      const batches = {
+        batches: scanResult.files.map((file, index) => ({ batchIndex: index + 1, files: [file], batchImportData: {} })),
+      };
+      const assembled = { nodes: [], edges: [] };
+      const fs: Record<string, string> = {
+        [join(root, ".understand-anything/intermediate/scan-result.json")]: JSON.stringify(scanResult),
+        [join(root, ".understand-anything/intermediate/batches.json")]: JSON.stringify(batches),
+        [join(root, ".understand-anything/intermediate/assembled-graph.json")]: JSON.stringify(assembled),
+      };
+      const writes: Record<string, string> = {};
+      const logs: string[] = [];
+
+      await expect(
+        runFullBuild(
+          {
+            core,
+            skillDir: "/skill",
+            projectRoot: root,
+            outputLanguage: "en",
+            batchMode: "segmented",
+            mappers: 4,
+            cliEntry,
+            llm: {
+              enabled: true,
+              required: true,
+              provider: { name: "fake", complete: async () => ({ text: "ok" }) },
+              globalConcurrency: 4,
+              qpmLimit: 8,
+            } as any,
+            log: (line) => logs.push(line),
+          },
+          {
+            execFileSync: vi.fn() as any,
+            ensureDirs: () => {},
+            resolveGitHash: () => "deadbeef",
+            createRegistry: async () => ({
+              resolveImports: () => [],
+              analyzeFile: () => ({ functions: [], classes: [] }),
+              extractCallGraph: () => [],
+            }),
+            existsSync: (p: string) => p in fs || p in writes,
+            readFileSync: (p: string) => {
+              const c = writes[p] ?? fs[p];
+              if (c === undefined) throw new Error(`missing ${p}`);
+              return c;
+            },
+            writeFileSync: (p: string, d: string) => { writes[p] = d; },
+          },
+        ),
+      ).rejects.toThrow(/mapper segment/);
+
+      expect(logs).toContain("[mapper] llm budget split into 4 slots: 1/2, 1/2, 1/2, 1/2");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("runs graph-level llm enhancement after deterministic wrap and writes graph stats", async () => {
@@ -545,6 +621,7 @@ describe("runFullBuild (orchestration)", () => {
           return c;
         },
         writeFileSync: (p: string, d: string) => { writes[p] = d; },
+        mkdirSync: () => {},
         ensureDirs: () => {},
         execFileSync: vi.fn() as any,
         resolveGitHash: () => "head123",
@@ -566,6 +643,162 @@ describe("runFullBuild (orchestration)", () => {
         excludeTests: true,
       },
     }));
+  });
+
+  it("resume fills missing full-build batches through the segmented scheduler with current mapper settings", async () => {
+    const { core } = makeCore();
+    const fs: Record<string, string> = {
+      "/repo/.understand-anything/intermediate/scan-result.json": JSON.stringify({
+        files: [
+          { path: "src/a.ts", fileCategory: "code", language: "ts" },
+          { path: "src/b.ts", fileCategory: "code", language: "ts" },
+        ],
+        totalFiles: 2,
+      }),
+      "/repo/.understand-anything/intermediate/batch-1.json": JSON.stringify({ nodes: [{ id: "a", filePath: "src/a.ts" }], edges: [] }),
+      "/repo/.understand-anything/intermediate/assembled-graph.json": JSON.stringify({ nodes: [{ id: "a", filePath: "src/a.ts" }, { id: "b", filePath: "src/b.ts" }], edges: [] }),
+    };
+    const writes: Record<string, string> = {};
+    const runSegmented = vi.fn().mockImplementation(async () => {
+      writes["/repo/.understand-anything/intermediate/batch-2.json"] = JSON.stringify({ nodes: [{ id: "b", filePath: "src/b.ts" }], edges: [] });
+      return { segments: 1, missing: 1, written: 1 };
+    });
+
+    await runResumeBuild(
+      {
+        core,
+        skillDir: "/skill",
+        projectRoot: "/repo",
+        mode: "resume",
+        cliEntry: "/cli.js",
+        mappers: 4,
+        llm: {
+          enabled: true,
+          required: true,
+          provider: { name: "fake", complete: async () => ({ text: "ok" }) },
+          globalConcurrency: 16,
+          qpmLimit: 30,
+        } as any,
+        llmWorkerArgs: ["--llm-analysis", "--llm-provider", "pkg"],
+        log: () => {},
+      },
+      {
+        existsSync: (p: string) => p in fs || p in writes,
+        readFileSync: (p: string) => {
+          const c = writes[p] ?? fs[p];
+          if (c === undefined) throw new Error(`missing ${p}`);
+          return c;
+        },
+        writeFileSync: (p: string, d: string) => { writes[p] = d; },
+        mkdirSync: () => {},
+        ensureDirs: () => {},
+        execFileSync: vi.fn() as any,
+        resolveGitHash: () => "head123",
+        resolveGitDirty: () => false,
+        createRegistry: async () => ({
+          resolveImports: () => [],
+          analyzeFile: () => ({ functions: [], classes: [] }),
+          extractCallGraph: () => [],
+        }),
+        validateCheckpoint: () => ({
+          manifest: { buildKind: "full" } as any,
+          batches: [
+            { batchIndex: 1, files: [{ path: "src/a.ts" }] },
+            { batchIndex: 2, files: [{ path: "src/b.ts" }] },
+          ],
+          batchIndexes: [1, 2],
+        }),
+        runSegmentedBatchGraph: runSegmented,
+        runLlmGraphEnhancement: vi.fn().mockImplementation(async ({ graph }) => ({
+          graph,
+          stats: { enabled: true, requested: 0, applied: 0, failed: 0, skipped: 0, failures: [] },
+        })),
+      } as any,
+    );
+
+    expect(runSegmented).toHaveBeenCalledOnce();
+    expect(runSegmented.mock.calls[0]![0]).toMatchObject({
+      cliEntry: "/cli.js",
+      mappers: 4,
+      llm: {
+        enabled: true,
+        extraArgs: ["--llm-analysis", "--llm-provider", "pkg"],
+        globalConcurrency: 16,
+        qpmLimit: 30,
+      },
+    });
+  });
+
+  it("resume runs graph-level llm enhancement for full-build checkpoints", async () => {
+    const { core } = makeCore();
+    const fs: Record<string, string> = {
+      "/repo/.understand-anything/intermediate/scan-result.json": JSON.stringify({
+        files: [{ path: "src/a.ts", fileCategory: "code", language: "ts" }],
+        totalFiles: 1,
+      }),
+      "/repo/.understand-anything/intermediate/batch-1.json": JSON.stringify({ nodes: [{ id: "src/a.ts", filePath: "src/a.ts" }], edges: [] }),
+      "/repo/.understand-anything/intermediate/assembled-graph.json": JSON.stringify({ nodes: [{ id: "src/a.ts", filePath: "src/a.ts" }], edges: [] }),
+    };
+    const writes: Record<string, string> = {};
+    const runGraphLlm = vi.fn().mockImplementation(async ({ graph }) => ({
+      graph: {
+        ...graph,
+        layers: [{ id: "layer:llm", name: "LLM Layer", nodeIds: ["src/a.ts"] }],
+        project: { ...graph.project, summary: "LLM resume summary" },
+        tour: [{ order: 1, title: "Resume tour" }],
+      },
+      stats: { enabled: true, providerName: "fake", requested: 3, applied: 3, failed: 0, skipped: 0, failures: [] },
+      artifacts: {
+        promptStubs: [{ operation: "layers", prompt: "resume layer prompt" }],
+        attemptJournal: [{ scope: "graph", operation: "layers", status: "ok", attempts: [{ attempt: 1, kind: "ok" }] }],
+      },
+    }));
+
+    const result = await runResumeBuild(
+      {
+        core,
+        skillDir: "/skill",
+        projectRoot: "/repo",
+        mode: "resume",
+        llm: { enabled: true, required: true, provider: { name: "fake", complete: async () => ({ text: "ok" }) } },
+        log: () => {},
+      },
+      {
+        existsSync: (p: string) => p in fs || p in writes,
+        readFileSync: (p: string) => {
+          const c = writes[p] ?? fs[p];
+          if (c === undefined) throw new Error(`missing ${p}`);
+          return c;
+        },
+        writeFileSync: (p: string, d: string) => { writes[p] = d; },
+        mkdirSync: () => {},
+        ensureDirs: () => {},
+        execFileSync: vi.fn() as any,
+        resolveGitHash: () => "head123",
+        resolveGitDirty: () => false,
+        createRegistry: async () => ({
+          resolveImports: () => [],
+          analyzeFile: () => ({ functions: [], classes: [] }),
+          extractCallGraph: () => [],
+        }),
+        validateCheckpoint: () => ({
+          manifest: { buildKind: "full" } as any,
+          batches: [{ batchIndex: 1, files: [{ path: "src/a.ts" }] }],
+          batchIndexes: [1],
+        }),
+        runLlmGraphEnhancement: runGraphLlm as any,
+      } as any,
+    );
+
+    expect(runGraphLlm).toHaveBeenCalledOnce();
+    expect(result.graph.layers).toEqual([{ id: "layer:llm", name: "LLM Layer", nodeIds: ["src/a.ts"] }]);
+    expect(result.graph.project.summary).toBe("LLM resume summary");
+    expect(JSON.parse(writes["/repo/.understand-anything/llm/latest-graph-stats.json"]!)).toMatchObject({ applied: 3 });
+    expect(JSON.parse(writes["/repo/.understand-anything/llm/layers.json"]!)).toMatchObject({
+      layers: [{ id: "layer:llm", name: "LLM Layer", nodeIds: ["src/a.ts"] }],
+    });
+    expect(writes["/repo/.understand-anything/llm/prompts/01-layers.txt"]).toBe("resume layer prompt");
+    expect(writes["/repo/.understand-anything/metrics/llm-attempts.ndjson"]).toContain("\"operation\":\"layers\"");
   });
 
   it("resume replays incremental batches and merges only changed files", async () => {
@@ -1113,7 +1346,7 @@ describe("runFullBuild (orchestration)", () => {
     expect(result.mode).toBe("incremental");
     expect(result.updatedFiles).toEqual(["src/a.ts"]);
     expect(saved.meta.m.gitCommitHash).toBe("head456");
-    expect(JSON.parse(writes["/state/.understand-anything/intermediate/phase2-input-manifest.json"]!).batchCount).toBe(1);
+    expect(JSON.parse(writes["/state/.understand-anything/intermediate/phase2-input-manifest.json"]!).batchCount).toBe(2);
   });
 
   it("backfill auto-detects missing code files in an isolated workspace", async () => {

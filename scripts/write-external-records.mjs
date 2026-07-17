@@ -9,19 +9,21 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { formatLocalTimestamp } from "./lib/time.mjs";
 
 const DEFAULT_NIGHTLY_WORKSHEET = "nightly-update";
 const DEFAULT_PROJECT_WORKSHEET = "project-update";
 
-async function loadFeishuSheetsRecordProvider() {
+async function loadFeishuSheetsModule() {
   try {
-    const mod = await import("@understand-anyway/provider-feishu-sheets");
-    return mod.FeishuSheetsRecordProvider;
+    return await import("@understand-anyway/provider-feishu-sheets");
   } catch {
-    const mod = await import(new URL("../packages/provider-feishu-sheets/dist/index.js", import.meta.url).href);
-    return mod.FeishuSheetsRecordProvider;
+    return await import(new URL("../packages/provider-feishu-sheets/dist/index.js", import.meta.url).href);
   }
 }
+
+const feishuSheetsModule = await loadFeishuSheetsModule();
+const { FeishuSheetsRecordProvider } = feishuSheetsModule;
 
 async function loadYamlParse() {
   try {
@@ -175,68 +177,14 @@ export function extractSpreadsheetToken(input) {
   return match ? match[1] : raw;
 }
 
-export const NIGHTLY_COLUMNS = [
-  "runId",
-  "startedAt",
-  "finishedAt",
-  "overallStatus",
-  "projectCount",
-  "successCount",
-  "failedCount",
-  "buildSuccessCount",
-  "recordProvider",
-  "recordStatus",
-  "resultJson",
-];
+export const NIGHTLY_COLUMNS = [...feishuSheetsModule.NIGHTLY_UPDATE_COLUMNS];
 
-export const PROJECT_COLUMNS = [
-  "runId",
-  "startedAt",
-  "finishedAt",
-  "project",
-  "repoPath",
-  "stateDir",
-  "overallStatus",
-  "buildStatus",
-  "gateStatus",
-  "gateApproved",
-  "gateFailureReason",
-  "criticalCount",
-  "warningCount",
-  "needsManualIntervention",
-  "commitBefore",
-  "commitAfter",
-  "nodeCount",
-  "edgeCount",
-  "containsEdges",
-  "importsEdges",
-  "callsEdges",
-  "fileNodeCount",
-  "missingFileCount",
-  "moduleStatus",
-  "llmEnabled",
-  "llmStatus",
-  "llmProvider",
-  "llmModel",
-  "llmRequests",
-  "llmTasks",
-  "llmProcessedTasks",
-  "llmFailures",
-  "llmTimeouts",
-  "llmCandidateFiles",
-  "llmProcessedFiles",
-  "llmBreakerTripped",
-  "llmEnrichedNodes",
-  "resultJson",
-  "buildLog",
-  "gateJson",
-  "gateLog",
-];
+export const PROJECT_COLUMNS = [...feishuSheetsModule.PROJECT_UPDATE_COLUMNS];
 
 export function buildNightlyEnvelope(aggregate) {
   return {
     kind: "nightly-update",
-    timestamp: aggregate.finishedAt || new Date().toISOString(),
+    timestamp: aggregate.finishedAt || formatLocalTimestamp(),
     payload: {
       runId: aggregate.runId || "",
       startedAt: aggregate.startedAt || "",
@@ -262,7 +210,7 @@ function summarizeModuleStatus(stats) {
 function buildProjectEnvelopes(aggregate) {
   return (Array.isArray(aggregate.projects) ? aggregate.projects : []).map((project) => ({
     kind: "project-update",
-    timestamp: project.finishedAt || aggregate.finishedAt || new Date().toISOString(),
+    timestamp: project.finishedAt || aggregate.finishedAt || formatLocalTimestamp(),
     payload: (() => {
       const gate = project.gate || project.review || {};
       const stats = gate.stats || {};
@@ -323,13 +271,14 @@ function buildProjectEnvelopes(aggregate) {
 
 export { buildProjectEnvelopes };
 
-function mappingFor(recordConfig, kind, fallbackWorksheet, fallbackColumns) {
+function mappingFor(recordConfig, kind, fallbackWorksheet) {
   const configured = recordConfig?.mappings?.[kind];
-  return {
-    worksheet: String(configured?.worksheet || fallbackWorksheet),
-    columns: Array.isArray(configured?.columns) && configured.columns.length > 0
-      ? configured.columns.map(String)
-      : fallbackColumns,
+  const worksheets = recordConfig?.worksheets ?? {};
+  const worksheetOverride = worksheets[kind]
+    || (kind === "nightly-update" ? worksheets.nightly : undefined)
+    || (kind === "project-update" ? worksheets.project : undefined);
+  const mapping = {
+    worksheet: String(configured?.worksheet || worksheetOverride || fallbackWorksheet),
     aliases: configured?.aliases && typeof configured.aliases === "object"
       ? Object.fromEntries(
           Object.entries(configured.aliases).map(([key, value]) => [
@@ -339,6 +288,10 @@ function mappingFor(recordConfig, kind, fallbackWorksheet, fallbackColumns) {
         )
       : undefined,
   };
+  if (Array.isArray(configured?.columns) && configured.columns.length > 0) {
+    mapping.columns = configured.columns.map(String);
+  }
+  return mapping;
 }
 
 export async function resolveRuntime(args) {
@@ -361,7 +314,6 @@ export async function resolveRuntime(args) {
 async function writeFeishu(args, runtime, aggregate) {
   const appId = runtime.recordConfig?.appId || process.env.FEISHU_APP_ID || process.env.LARK_APP_ID || "";
   if (!appId) throw new Error("missing Feishu app id; set record.config.feishu-sheets.appId or FEISHU_APP_ID/LARK_APP_ID");
-  const FeishuSheetsRecordProvider = await loadFeishuSheetsRecordProvider();
   const provider = new FeishuSheetsRecordProvider({
     appId,
     appSecret: runtime.recordConfig?.appSecret || process.env.FEISHU_APP_SECRET || process.env.LARK_APP_SECRET || undefined,
@@ -369,8 +321,8 @@ async function writeFeishu(args, runtime, aggregate) {
     appSecretEnv: runtime.recordConfig?.appSecretEnv || process.env.FEISHU_APP_SECRET_ENV || "FEISHU_APP_SECRET",
     spreadsheetToken: extractSpreadsheetToken(runtime.sheet),
     mappings: {
-      "nightly-update": mappingFor(runtime.recordConfig, "nightly-update", args.nightlyWorksheet, NIGHTLY_COLUMNS),
-      "project-update": mappingFor(runtime.recordConfig, "project-update", args.projectWorksheet, PROJECT_COLUMNS),
+      "nightly-update": mappingFor(runtime.recordConfig, "nightly-update", args.nightlyWorksheet),
+      "project-update": mappingFor(runtime.recordConfig, "project-update", args.projectWorksheet),
     },
     log: (message) => process.stderr.write(`${message}\n`),
   });

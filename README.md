@@ -7,6 +7,10 @@ English | [简体中文](README.zh-CN.md)
 [![pnpm](https://img.shields.io/badge/pnpm-9%2B-F69220.svg?logo=pnpm&logoColor=white)](https://pnpm.io/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
+<p align="center">
+  <img src="docs/assets/understand-anyway-cover.png" alt="Understand Anyway - AI-Powered Code Graph Intelligence" />
+</p>
+
 > **Build, publish, serve, and keep many Understand-Anything projects in sync from one place.**
 
 Understand-Anything is great at understanding a project. The missing piece for

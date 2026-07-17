@@ -208,7 +208,7 @@ export async function repairLlmFailures(
   });
 
   if (!io.existsSync(statsPath)) {
-    log("repair: no llm/latest-stats.json found; nothing to repair");
+    log("repair: no llm/latest-stats.json found; use build --resume for interrupted Phase 2 batch runs");
     return emit(base());
   }
 

@@ -65,6 +65,9 @@ llmProfiles:
     config:
       command: "traex"
       model: "<your-model>"
+      # Optional provider-scoped failover list. Names follow this provider's
+      # own model naming rules. Omit when a single `model` is enough.
+      modelCandidates: ["<your-primary-model>", "<your-fallback-model>"]
       modelArg: "-m"
   traecli:
     package: "<your-trae-cli-v1-provider-package>"
@@ -74,44 +77,21 @@ llmProfiles:
 
 # Record sinks. Set `providers: []` to disable external records entirely.
 # Per-provider config goes under `config` keyed by provider name.
+# Feishu Sheets has built-in headers for user-event / nightly-update /
+# project-update. Omit `worksheets` to use those names as worksheet titles.
 record:
   providers: ["local"]
   config:
     feishu-sheets:
       spreadsheetToken: "{{ RECORD_SHEET_TOKEN }}"   # placeholder
-      worksheets:
-        nightly: "nightly-update"
-        project: "project-update"
-      mappings:
-        user-event:
-          worksheet: "user-event"
-          columns:
-            ["eventId", "eventTime", "eventType", "sessionId", "userName",
-             "userEnName", "openId", "email", "authReason", "departmentPaths",
-             "sourceIp", "userAgent", "targetType", "targetId", "targetName",
-             "targetUrl", "extra"]
-        nightly-update:
-          worksheet: "nightly-update"
-          columns:
-            ["runId", "startedAt", "finishedAt", "overallStatus", "projectCount",
-             "successCount", "failedCount", "buildSuccessCount", "recordProvider",
-             "recordStatus", "resultJson"]
-        project-update:
-          worksheet: "project-update"
-          columns:
-            ["runId", "startedAt", "finishedAt", "project", "repoPath", "stateDir",
-             "overallStatus", "buildStatus", "gateStatus", "gateApproved",
-             "gateFailureReason", "criticalCount", "warningCount",
-             "needsManualIntervention", "commitBefore", "commitAfter", "nodeCount",
-             "edgeCount", "containsEdges", "importsEdges", "callsEdges",
-             "fileNodeCount", "missingFileCount", "moduleStatus", "llmEnabled",
-             "llmStatus", "llmProvider", "llmModel", "llmRequests", "llmTasks",
-             "llmProcessedTasks", "llmFailures", "llmTimeouts", "llmCandidateFiles",
-             "llmProcessedFiles", "llmBreakerTripped", "llmEnrichedNodes",
-             "resultJson", "buildLog", "gateJson", "gateLog"]
+      # Optional worksheet title overrides. Defaults are the exact keys below.
+      # worksheets:
+      #   user-event: "user-event"
+      #   nightly-update: "nightly-update"
+      #   project-update: "project-update"
 
-# Deployment environment profiles. Build spec follows deploy profile:
-# ppe = small, prod = large. Later environments can copy this pattern.
+# Deployment environment profiles. Build profiles only describe build behavior.
+# Provider-specific model names stay under llmProfiles.*.config.
 deployProfiles:
   ppe:
     deploy:
@@ -126,7 +106,9 @@ deployProfiles:
       outputLanguage: "en"
       llmAnalysis: true
       llmRequired: false
-      llmModelCandidates: ["small"]
+      mappers: 1
+      llmConcurrencyPerMapper: 1
+      llmQpmLimit: 2
       llmRetry:
         maxAttempts: 2
         initialBackoffMs: 300
@@ -144,8 +126,10 @@ deployProfiles:
       excludeTests: true
       outputLanguage: "en"
       llmAnalysis: true
-      llmRequired: false
-      llmModelCandidates: ["large"]
+      llmRequired: true
+      mappers: 4
+      llmConcurrencyPerMapper: 4
+      llmQpmLimit: 30
       llmRetry:
         maxAttempts: 3
         initialBackoffMs: 500

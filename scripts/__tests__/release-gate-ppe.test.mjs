@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const script = resolve(repoRoot, "scripts", "release-gate-ppe.mjs");
+const packageVersion = JSON.parse(readFileSync(resolve(repoRoot, "packages", "cli", "package.json"), "utf8")).version;
+const escapedVersion = packageVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 function isolatedEnv(env = {}) {
   const next = { ...process.env };
@@ -76,9 +79,9 @@ function run(args, env = {}) {
   assert.match(result.stdout, /ppe-oss-release/);
   assert.match(result.stdout, /ssh -n -o BatchMode=yes/);
   // Standard install: from a registry, not from a source checkout build.
-  assert.match(result.stdout, /npm (install|i) .*@understand-anyway\/cli@0\.0\.1-next\.8/);
+  assert.match(result.stdout, new RegExp(`npm (install|i) .*@understand-anyway\\/cli@${escapedVersion}`));
   assert.match(result.stdout, /--registry http:\/\/127\.0\.0\.1:4873/);
-  assert.match(result.stdout, /understand-anyway-plugin-api-0\.0\.1-next\.8\.tgz/);
+  assert.match(result.stdout, new RegExp(`understand-anyway-plugin-api-${escapedVersion}\\.tgz`));
   assert.doesNotMatch(result.stdout, /understand-anyway-plugin-api-\*\.tgz/);
   // Smoke dashboard port must be chosen on the PPE host at runtime so repeated
   // release gates do not collide with a dashboard left running by another case.

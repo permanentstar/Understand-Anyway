@@ -31,7 +31,7 @@ describe("parseWorkerArgs", () => {
       llmAnalysis: false,
       llmProvider: null,
       llmProfile: null,
-      llmModelCandidates: [],
+      providerModelCandidates: [],
       llmRequired: false,
       llmTimeoutMs: null,
       llmRetryPolicy: {},
@@ -57,7 +57,7 @@ describe("parseWorkerArgs", () => {
       ...minimum,
       "--llm-analysis",
       "--llm-provider", "@pkg/llm",
-      "--llm-model-candidates", "small,large",
+      "--llm-provider-model-candidates", "Qwen3.6-Plus,Qwen3.6-Max",
       "--llm-required",
       "--llm-timeout", "30000",
       "--llm-retry-max-attempts", "5",
@@ -70,7 +70,7 @@ describe("parseWorkerArgs", () => {
     ]);
     expect(parsed.llmAnalysis).toBe(true);
     expect(parsed.llmProvider).toBe("@pkg/llm");
-    expect(parsed.llmModelCandidates).toEqual(["small", "large"]);
+    expect(parsed.providerModelCandidates).toEqual(["Qwen3.6-Plus", "Qwen3.6-Max"]);
     expect(parsed.llmRequired).toBe(true);
     expect(parsed.llmTimeoutMs).toBe(30000);
     expect(parsed.llmRetryPolicy).toEqual({
@@ -86,6 +86,11 @@ describe("parseWorkerArgs", () => {
 
   it("rejects unknown options", () => {
     expect(() => parseWorkerArgs([...minimum, "--turbo"])).toThrow(/unknown worker option/);
+  });
+
+  it("rejects legacy worker llm model candidates", () => {
+    expect(() => parseWorkerArgs([...minimum, "--llm-model-candidates", "small,large"]))
+      .toThrow(/unknown worker option/);
   });
 
   it("rejects missing required flags", () => {
@@ -181,6 +186,7 @@ describe("parseWorkerArgs", () => {
       "--indexes-file", join(intermediateDir, "batch-indexes-1-1.txt"),
       "--llm-analysis",
       "--llm-provider", "@pkg/llm",
+      "--llm-provider-model-candidates", "Qwen3.6-Plus,Qwen3.6-Max",
       "--global-llm-concurrency", "2",
       "--llm-qpm-limit", "4",
     ]);
@@ -222,6 +228,7 @@ describe("parseWorkerArgs", () => {
     expect(firstCall).toMatchObject({
       qpmLimit: 4,
       globalConcurrency: 2,
+      modelCandidates: ["Qwen3.6-Plus", "Qwen3.6-Max"],
       files: [{ path: "src/a.ts" }],
     });
     expect(writeBatchFile).toHaveBeenCalledTimes(1);

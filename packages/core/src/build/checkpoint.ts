@@ -41,7 +41,11 @@ function assertExpectedBoolean(name: string, actual: unknown, expected: boolean 
   }
 }
 
-export function validatePhase2Checkpoint(paths: BuildPaths, deps: CheckpointDeps = {}): ValidCheckpoint {
+function validatePhase2CheckpointInternal(
+  paths: BuildPaths,
+  deps: CheckpointDeps,
+  options: { requireBatchArtifacts: boolean },
+): ValidCheckpoint {
   const exists = deps.existsSync ?? nodeExistsSync;
   const read = deps.readFileSync ?? ((p: string) => nodeReadFileSync(p, "utf8"));
 
@@ -70,10 +74,20 @@ export function validatePhase2Checkpoint(paths: BuildPaths, deps: CheckpointDeps
   }
 
   const batchIndexes = batches.map((b) => Number(b.batchIndex)).filter((n): n is number => Number.isInteger(n));
-  for (const index of batchIndexes) {
-    const file = resolve(paths.intermediateDir, `batch-${index}.json`);
-    if (!exists(file)) throw new Error(`build: resume batch artifact missing: ${file}`);
+  if (options.requireBatchArtifacts) {
+    for (const index of batchIndexes) {
+      const file = resolve(paths.intermediateDir, `batch-${index}.json`);
+      if (!exists(file)) throw new Error(`build: resume batch artifact missing: ${file}`);
+    }
   }
 
   return { manifest, batches, batchIndexes };
+}
+
+export function validatePhase2Checkpoint(paths: BuildPaths, deps: CheckpointDeps = {}): ValidCheckpoint {
+  return validatePhase2CheckpointInternal(paths, deps, { requireBatchArtifacts: true });
+}
+
+export function validatePhase2ResumeCheckpoint(paths: BuildPaths, deps: CheckpointDeps = {}): ValidCheckpoint {
+  return validatePhase2CheckpointInternal(paths, deps, { requireBatchArtifacts: false });
 }

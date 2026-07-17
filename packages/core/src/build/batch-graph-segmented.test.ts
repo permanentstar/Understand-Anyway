@@ -101,8 +101,7 @@ function baseOptions(overrides: Partial<SegmentedScheduleOptions> = {}): Segment
     outputLanguage: "en",
     projectName: "demo",
     gitHash: "deadbeef",
-    mapperBatchCount: 2,
-    mapperConcurrency: 2,
+    mappers: 2,
     log: () => {},
     ...overrides,
   };
@@ -126,28 +125,28 @@ describe("writeBatchGraphFilesSegmented", () => {
     expect(spawn).not.toHaveBeenCalled();
   });
 
-  it("splits missing batches into mapperBatchCount-sized segments and runs concurrent workers", async () => {
+  it("auto-sizes segments to fill mapper slots and runs concurrent workers", async () => {
     const batches = [1, 2, 3, 4, 5, 6].map((idx) => makeBatch(idx, [`src/${idx}.ts`]));
     const state = createVirtualFs();
     const produces = (segment: number[]) => Object.fromEntries(
       segment.map((idx) => [resolve(intermediateDir, `batch-${idx}.json`), { nodes: [{ id: `n${idx}` }] }]),
     );
     const scripts: SpawnScript[] = [
-      { produces: produces([1, 2]) },
-      { produces: produces([3, 4]) },
-      { produces: produces([5, 6]) },
+      { produces: produces([1, 2, 3]) },
+      { produces: produces([4, 5, 6]) },
     ];
     const { spawn, calls } = spawnRecorder(scripts, state);
 
     const result = await writeBatchGraphFilesSegmented(
-      baseOptions({ batches, mapperBatchCount: 2, mapperConcurrency: 2 }),
+      baseOptions({ batches, mappers: 2 }),
       { ...fsDeps(state), spawn, setInterval: () => 0 as unknown as NodeJS.Timeout, clearInterval: () => {}, reaperRegistry: createReaperRegistry() },
     );
 
-    expect(result.segments).toBe(3);
+    expect(result.segments).toBe(2);
+    expect(result.mapperBatchCount).toBe(3);
     expect(result.missing).toBe(6);
     expect(result.written).toBe(6);
-    expect(spawn).toHaveBeenCalledTimes(3);
+    expect(spawn).toHaveBeenCalledTimes(2);
     expect(calls[0]?.argv).toEqual(expect.arrayContaining(["batch-mapper-worker", "--state-dir", "/state", "--project-root", "/repo"]));
   });
 
@@ -164,7 +163,7 @@ describe("writeBatchGraphFilesSegmented", () => {
     const { spawn } = spawnRecorder(scripts, state);
     await expect(
       writeBatchGraphFilesSegmented(
-        baseOptions({ batches, mapperBatchCount: 2, mapperConcurrency: 1 }),
+        baseOptions({ batches, mappers: 1 }),
         { ...fsDeps(state), spawn, setInterval: () => 0 as unknown as NodeJS.Timeout, clearInterval: () => {}, reaperRegistry: createReaperRegistry() },
       ),
     ).rejects.toThrow(/mapper segment 1-2 failed.*invalid=1/);
@@ -176,7 +175,7 @@ describe("writeBatchGraphFilesSegmented", () => {
     const { spawn } = spawnRecorder([{ exitCode: 7 }], state);
     await expect(
       writeBatchGraphFilesSegmented(
-        baseOptions({ batches, mapperBatchCount: 1, mapperConcurrency: 1 }),
+        baseOptions({ batches, mappers: 1 }),
         { ...fsDeps(state), spawn, setInterval: () => 0 as unknown as NodeJS.Timeout, clearInterval: () => {}, reaperRegistry: createReaperRegistry() },
       ),
     ).rejects.toThrow(/mapper segment 1-1 failed \(exit=7\)/);
@@ -196,8 +195,7 @@ describe("writeBatchGraphFilesSegmented", () => {
     const result = await writeBatchGraphFilesSegmented(
       baseOptions({
         batches,
-        mapperBatchCount: 2,
-        mapperConcurrency: 2,
+        mappers: 2,
         llm: {
           enabled: true,
           extraArgs: ["--llm-analysis", "--llm-provider", "pkg"],
@@ -250,7 +248,7 @@ describe("writeBatchGraphFilesSegmented", () => {
       state,
     );
     await writeBatchGraphFilesSegmented(
-      baseOptions({ batches, mapperBatchCount: 2, mapperConcurrency: 2 }),
+      baseOptions({ batches, mappers: 2 }),
       { ...fsDeps(state), spawn, setInterval: () => 0 as unknown as NodeJS.Timeout, clearInterval: () => {}, reaperRegistry: createReaperRegistry() },
     );
     expect(state.files.has(resolve(intermediateDir, "batch-indexes-1-2.txt"))).toBe(true);
@@ -267,7 +265,7 @@ describe("writeBatchGraphFilesSegmented", () => {
     const produces = { [resolve(intermediateDir, "batch-2.json")]: { nodes: [{ id: "b" }] } };
     const { spawn } = spawnRecorder([{ produces }], state);
     const result = await writeBatchGraphFilesSegmented(
-      baseOptions({ batches, includePaths: ["src/b.ts"], mapperBatchCount: 4, mapperConcurrency: 1 }),
+      baseOptions({ batches, includePaths: ["src/b.ts"], mappers: 1 }),
       { ...fsDeps(state), spawn, setInterval: () => 0 as unknown as NodeJS.Timeout, clearInterval: () => {}, reaperRegistry: createReaperRegistry() },
     );
     expect(result.missing).toBe(1);
@@ -282,7 +280,7 @@ describe("writeBatchGraphFilesSegmented", () => {
     );
     const { spawn } = spawnRecorder([{ produces: produces([1, 2]) }], state);
     await writeBatchGraphFilesSegmented(
-      baseOptions({ batches, mapperBatchCount: 2, mapperConcurrency: 1 }),
+      baseOptions({ batches, mappers: 1 }),
       { ...fsDeps(state), spawn, setInterval: () => 0 as unknown as NodeJS.Timeout, clearInterval: () => {}, reaperRegistry: createReaperRegistry() },
     );
     const ndjson = state.files.get(resolve(intermediateDir, "batch-mapper.ndjson"))!;

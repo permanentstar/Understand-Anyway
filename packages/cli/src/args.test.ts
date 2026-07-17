@@ -215,15 +215,15 @@ describe("parseArgs build", () => {
       llmProfile: null,
       embeddingProvider: null,
       llmRequired: null,
-      llmModelCandidates: [],
       llmRetry: {
         maxAttempts: null,
         initialBackoffMs: null,
         maxBackoffMs: null,
       },
       batchMode: "auto",
-      mapperBatchCount: null,
-      mapperConcurrency: null,
+      mappers: null,
+      llmConcurrencyPerMapper: null,
+      llmQpmLimit: null,
     });
   });
 
@@ -289,13 +289,17 @@ describe("parseArgs build", () => {
   });
 
   it("parses llm build flags", () => {
-    const parsed = parseArgs(["build", "--llm-analysis", "--llm-provider", "pkg-llm", "--embedding-provider", "pkg-embed", "--llm-required", "--llm-model-candidates", "small,large", "--project", "alpha"]);
+    const parsed = parseArgs(["build", "--llm-analysis", "--llm-provider", "pkg-llm", "--embedding-provider", "pkg-embed", "--llm-required", "--project", "alpha"]);
     if (parsed.command !== "build") throw new Error("expected build");
     expect(parsed.llmAnalysis).toBe(true);
     expect(parsed.llmProvider).toBe("pkg-llm");
     expect(parsed.embeddingProvider).toBe("pkg-embed");
     expect(parsed.llmRequired).toBe(true);
-    expect(parsed.llmModelCandidates).toEqual(["small", "large"]);
+  });
+
+  it("rejects build-level llm model candidates", () => {
+    expect(() => parseArgs(["build", "--llm-model-candidates", "small,large", "--project", "alpha"]))
+      .toThrow(/unknown option: --llm-model-candidates/);
   });
 
   it("defaults llm flags to null/disabled intent", () => {
@@ -332,24 +336,29 @@ describe("parseArgs build", () => {
       .toThrow(/unknown option: --llm-retry-max-backoff/);
   });
 
-  it("parses C7 batch-mode tuning flags", () => {
+  it("parses C7 mapper and LLM budget tuning flags", () => {
     const parsed = parseArgs([
       "build",
       "--batch-mode", "segmented",
-      "--mapper-batch-count", "25",
-      "--mapper-concurrency", "4",
+      "--mappers", "4",
+      "--llm-concurrency-per-mapper", "4",
+      "--llm-qpm-limit", "30",
       "--project", "alpha",
     ]);
     if (parsed.command !== "build") throw new Error("expected build");
     expect(parsed.batchMode).toBe("segmented");
-    expect(parsed.mapperBatchCount).toBe(25);
-    expect(parsed.mapperConcurrency).toBe(4);
+    expect(parsed.mappers).toBe(4);
+    expect(parsed.llmConcurrencyPerMapper).toBe(4);
+    expect(parsed.llmQpmLimit).toBe(30);
   });
 
-  it("rejects invalid batch-mode/mapper values", () => {
+  it("rejects invalid batch-mode/mapper/LLM budget values", () => {
     expect(() => parseArgs(["build", "--project", "alpha", "--batch-mode", "turbo"])).toThrow(/--batch-mode/);
-    expect(() => parseArgs(["build", "--project", "alpha", "--mapper-batch-count", "0"])).toThrow(/--mapper-batch-count/);
-    expect(() => parseArgs(["build", "--project", "alpha", "--mapper-concurrency", "-1"])).toThrow(/--mapper-concurrency/);
+    expect(() => parseArgs(["build", "--project", "alpha", "--mappers", "0"])).toThrow(/--mappers/);
+    expect(() => parseArgs(["build", "--project", "alpha", "--llm-concurrency-per-mapper", "-1"])).toThrow(/--llm-concurrency-per-mapper/);
+    expect(() => parseArgs(["build", "--project", "alpha", "--llm-qpm-limit", "0"])).toThrow(/--llm-qpm-limit/);
+    expect(() => parseArgs(["build", "--project", "alpha", "--mapper-concurrency", "4"])).toThrow(/unknown option: --mapper-concurrency/);
+    expect(() => parseArgs(["build", "--project", "alpha", "--mapper-batch-count", "25"])).toThrow(/unknown option: --mapper-batch-count/);
   });
 
   it("rejects multiple build modes", () => {

@@ -149,13 +149,11 @@ export function renderPortalPage(view: PortalView): string {
     .map((project, index) => renderExtraProjectCard(project, primaryProjects.length + index + 1))
     .join("\n");
 
-  const stageBackgroundCss = assets.background
-    ? `\n      .stage { background: url("${assets.background}") center / contain no-repeat; }`
-    : "";
-
-  const pageBackgroundCss = assets.pageBackground
-    ? `\n      body { background: url("${assets.pageBackground}") center / cover no-repeat fixed; }`
-    : "";
+  const stageBackgroundCss = assets.pageBackground
+    ? `\n      .stage { background: url("${assets.pageBackground}") top center / 100% auto no-repeat; }`
+    : assets.background
+      ? `\n      .stage { background: url("${assets.background}") center / contain no-repeat; }`
+      : "";
 
   const footerAvatars = [assets.footerLeft, assets.footerRight];
   const footerLinks = footerLinkViews.slice(0, 2).map((link, index) => {
@@ -176,7 +174,7 @@ export function renderPortalPage(view: PortalView): string {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(title)}</title>
-    <style>${PORTAL_STYLES}${stageBackgroundCss}${pageBackgroundCss}
+    <style>${PORTAL_STYLES}${stageBackgroundCss}
     </style>
   </head>
   <body>

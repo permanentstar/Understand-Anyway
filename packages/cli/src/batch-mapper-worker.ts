@@ -31,7 +31,7 @@ export interface WorkerArgs {
   llmAnalysis: boolean;
   llmProvider: string | null;
   llmProfile: string | null;
-  llmModelCandidates: string[];
+  providerModelCandidates: string[];
   llmRequired: boolean;
   llmTimeoutMs: number | null;
   llmRetryPolicy: Partial<RetryPolicy>;
@@ -74,7 +74,7 @@ export function parseWorkerArgs(argv: string[]): WorkerArgs {
   let llmAnalysis = false;
   let llmProvider: string | null = null;
   let llmProfile: string | null = null;
-  let llmModelCandidates: string[] = [];
+  let providerModelCandidates: string[] = [];
   let llmRequired = false;
   let llmTimeoutMs: number | null = null;
   let globalLlmConcurrency: number | null = null;
@@ -138,8 +138,8 @@ export function parseWorkerArgs(argv: string[]): WorkerArgs {
       case "--llm-profile":
         llmProfile = take();
         break;
-      case "--llm-model-candidates":
-        llmModelCandidates = take().split(",").map((entry) => entry.trim()).filter(Boolean);
+      case "--llm-provider-model-candidates":
+        providerModelCandidates = take().split(",").map((entry) => entry.trim()).filter(Boolean);
         break;
       case "--llm-required":
         llmRequired = true;
@@ -186,7 +186,7 @@ export function parseWorkerArgs(argv: string[]): WorkerArgs {
     llmAnalysis,
     llmProvider,
     llmProfile,
-    llmModelCandidates,
+    providerModelCandidates,
     llmRequired,
     llmTimeoutMs,
     llmRetryPolicy: retry,
@@ -307,7 +307,7 @@ export async function runBatchMapperWorker(
         retryPolicy: { ...args.llmRetryPolicy } as RetryPolicy,
         qpmLimit: args.llmQpmLimit ?? undefined,
         globalConcurrency: args.globalLlmConcurrency ?? undefined,
-        modelCandidates: args.llmModelCandidates,
+        modelCandidates: args.providerModelCandidates,
         outputLanguage: args.outputLanguage,
       });
       llmAnalyses = run.analyses;

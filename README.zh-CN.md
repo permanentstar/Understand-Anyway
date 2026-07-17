@@ -7,6 +7,10 @@
 [![pnpm](https://img.shields.io/badge/pnpm-9%2B-F69220.svg?logo=pnpm&logoColor=white)](https://pnpm.io/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
+<p align="center">
+  <img src="docs/assets/understand-anyway-cover.png" alt="Understand Anyway - AI-Powered Code Graph Intelligence" />
+</p>
+
 > **把多个 Understand-Anything 项目的构建、发布、服务与定时同步，收敛到同一套运行层里。**
 
 Understand-Anything 很擅长“理解一个项目”。真正落到部署场景，缺的往往是外围那一层：重复 build、版本化发布、共享只读 gateway、定时刷新任务，以及按环境切换的集成能力。Understand-Anyway 就是补这层运行与编排能力。

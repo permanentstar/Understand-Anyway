@@ -86,6 +86,8 @@ function runScript(args) {
     check("happy: nightly.summary.successCount=2", payload.nightly?.summary?.successCount === 2, JSON.stringify(payload));
     check("happy: refresh.status=0", payload.refresh?.status === 0, JSON.stringify(payload));
     check("happy: logs.daily captured", payload.logs?.daily === logPath, JSON.stringify(payload.logs));
+    check("happy: startedAt uses local timezone offset", /^[0-9T:.+-]+[+-]\d{2}:\d{2}$/.test(payload.startedAt), payload.startedAt);
+    check("happy: finishedAt uses local timezone offset", /^[0-9T:.+-]+[+-]\d{2}:\d{2}$/.test(payload.finishedAt), payload.finishedAt);
     check("happy: stdout reports overallStatus", result.stdout.trim() === "success", result.stdout);
   } finally {
     rmSync(work, { recursive: true, force: true });

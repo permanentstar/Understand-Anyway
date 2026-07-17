@@ -19,7 +19,7 @@ import { buildProjectSourceMirrorPath, readProjectVersionState } from "@understa
 import type { BuildArgs } from "./args.js";
 import { resolveBuildConfig, type ResolvedBuildOptions } from "./build-config.js";
 import { buildEmbeddingProvider } from "./build-embedding.js";
-import { buildLlmProvider, resolveLlmProfile } from "./build-llm.js";
+import { buildLlmProvider, resolveLlmProfile, resolveProviderModelCandidates } from "./build-llm.js";
 import { CLI_ENTRY } from "./cli-entry.js";
 import { loadResolvedConfig } from "./config/load.js";
 import { resolveProjectContext } from "./project-context.js";
@@ -56,14 +56,15 @@ function buildLlmWorkerArgs(
   llmProfileName: string | null,
   resolved: ResolvedBuildOptions,
   configPath: string | null,
+  providerModelCandidates: string[],
 ): string[] {
   if (!resolved.llmAnalysis) return [];
   const argv: string[] = ["--llm-analysis"];
   if (configPath) argv.push("--config", configPath);
   if (llmProfileName) argv.push("--llm-profile", llmProfileName);
   if (providerPackageName) argv.push("--llm-provider", providerPackageName);
-  if (resolved.llmModelCandidates.length > 0) {
-    argv.push("--llm-model-candidates", resolved.llmModelCandidates.join(","));
+  if (providerModelCandidates.length > 0) {
+    argv.push("--llm-provider-model-candidates", providerModelCandidates.join(","));
   }
   if (resolved.llmRequired) argv.push("--llm-required");
   if (resolved.llmRetryPolicy.maxAttempts !== undefined) {
@@ -117,6 +118,7 @@ export async function runBuild(args: BuildArgs, options: RunBuildOptions = {}): 
   const resolved = resolveBuildConfig(args, config);
   const llmProfile = args.llmProfile ? resolveLlmProfile(config, args.llmProfile) : null;
   const llmConfig = llmProfile?.config ?? config;
+  const providerModelCandidates = resolveProviderModelCandidates(llmConfig);
   const llmProviderPackageName = args.llmProvider ?? llmProfile?.packageName ?? config.providers?.llm?.package ?? null;
   const embeddingPackageName = args.embeddingProvider ?? config.providers?.embedding?.package ?? null;
 
@@ -159,15 +161,16 @@ export async function runBuild(args: BuildArgs, options: RunBuildOptions = {}): 
       required: resolved.llmRequired,
       provider: llmProvider,
       retryPolicy: resolved.llmRetryPolicy,
-      modelCandidates: resolved.llmModelCandidates,
+      modelCandidates: providerModelCandidates,
+      globalConcurrency: resolved.mappers * resolved.llmConcurrencyPerMapper,
+      qpmLimit: resolved.llmQpmLimit,
     },
     embedding: {
       enabled: Boolean(embeddingProvider),
       provider: embeddingProvider,
     },
     batchMode: resolved.batchMode,
-    mapperBatchCount: resolved.mapperBatchCount,
-    mapperConcurrency: resolved.mapperConcurrency,
+    mappers: resolved.mappers,
     pluginRoot: resolved.pluginRoot,
     cliEntry,
     llmWorkerArgs: buildLlmWorkerArgs(
@@ -175,6 +178,7 @@ export async function runBuild(args: BuildArgs, options: RunBuildOptions = {}): 
       args.llmProfile,
       resolved,
       effectiveConfigPath && existsSync(effectiveConfigPath) ? effectiveConfigPath : null,
+      providerModelCandidates,
     ),
     log,
   });

@@ -64,6 +64,10 @@ export interface LlmBuildOptions {
   retryPolicy?: RetryPolicy;
   /** Ordered model candidates. Providers may honor `request.model`. */
   modelCandidates?: string[];
+  /** Global LLM call concurrency budget for segmented mapper workers. */
+  globalConcurrency?: number;
+  /** Global LLM QPM budget for segmented mapper workers. */
+  qpmLimit?: number;
   /** Cooldown applied to a model after a retryable task failure. Defaults to 60s. */
   modelCooldownMs?: number;
 }
@@ -522,17 +526,176 @@ function buildBatchFileAnalysisPrompt(
   ].join("\n");
 }
 
+function findJsonObjectEnd(text: string, start: number): number {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+    if (char === "{") {
+      depth += 1;
+      continue;
+    }
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
+function collectJsonTextCandidates(text: string): string[] {
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+  const add = (candidate: string) => {
+    const trimmed = candidate.trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    candidates.push(trimmed);
+  };
+
+  const fencePattern = /```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/gi;
+  for (const match of text.matchAll(fencePattern)) {
+    add(match[1] ?? "");
+  }
+  add(text);
+  return candidates;
+}
+
+function collectJsonObjectCandidates(text: string): string[] {
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+  const add = (candidate: string) => {
+    const trimmed = candidate.trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    candidates.push(trimmed);
+  };
+
+  for (const candidate of collectJsonTextCandidates(text)) {
+    add(candidate);
+  }
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] !== "{") continue;
+    const end = findJsonObjectEnd(text, index);
+    if (end < 0) continue;
+    add(text.slice(index, end + 1));
+    index = end;
+  }
+  return candidates;
+}
+
+function parseBatchJsonObject(text: string): { results?: unknown } {
+  const errors: string[] = [];
+  for (const candidate of collectJsonObjectCandidates(text)) {
+    try {
+      const parsed = JSON.parse(candidate) as { results?: unknown };
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Array.isArray(parsed.results)) {
+        return parsed;
+      }
+      errors.push("candidate JSON object is missing results[]");
+    } catch (error) {
+      errors.push((error as Error).message);
+    }
+  }
+  const reason = errors[0] ?? "no JSON object candidate found";
+  const prefix = text.trim().replace(/\s+/g, " ").slice(0, 240);
+  throw new LlmError("parse", `LLM batch file analysis parse failed: ${reason}; responsePrefix=${JSON.stringify(prefix)}`);
+}
+
+function findJsonArrayEnd(text: string, start: number): number {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+    if (char === "[") {
+      depth += 1;
+      continue;
+    }
+    if (char === "]") {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
+function recoverBatchResultEntries(text: string): unknown[] {
+  const entries: unknown[] = [];
+  const seenFilePaths = new Set<string>();
+  const resultsPattern = /"results"\s*:\s*\[/g;
+
+  for (const candidate of collectJsonTextCandidates(text)) {
+    resultsPattern.lastIndex = 0;
+    for (const match of candidate.matchAll(resultsPattern)) {
+      const arrayStart = (match.index ?? 0) + match[0].lastIndexOf("[");
+      const arrayEnd = findJsonArrayEnd(candidate, arrayStart);
+      const scanEnd = arrayEnd >= 0 ? arrayEnd : candidate.length;
+      for (let index = arrayStart + 1; index < scanEnd; index += 1) {
+        if (candidate[index] !== "{") continue;
+        const objectEnd = findJsonObjectEnd(candidate, index);
+        if (objectEnd < 0 || objectEnd > scanEnd) continue;
+        try {
+          const parsed = JSON.parse(candidate.slice(index, objectEnd + 1)) as { filePath?: unknown; response?: unknown };
+          const filePath = typeof parsed.filePath === "string" ? parsed.filePath : "";
+          if (filePath && Object.prototype.hasOwnProperty.call(parsed, "response") && !seenFilePaths.has(filePath)) {
+            entries.push(parsed);
+            seenFilePaths.add(filePath);
+          }
+        } catch {
+          // Ignore malformed entry fragments; the caller keeps the original parse error if nothing is recovered.
+        }
+        index = objectEnd;
+      }
+    }
+  }
+
+  return entries;
+}
+
 function parseBatchFileAnalysisResponse(
   text: string,
   parseResponse: (response: string) => LLMFileAnalysis | null,
 ): Array<{ filePath: string; analysis: LLMFileAnalysis }> {
-  const trimmed = text.trim();
-  const fenceMatch = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-  const jsonText = fenceMatch?.[1] ? fenceMatch[1].trim() : trimmed;
-  const parsed = JSON.parse(jsonText) as { results?: unknown };
-  if (!Array.isArray(parsed.results)) return [];
+  let results: unknown[];
+  try {
+    const parsed = parseBatchJsonObject(text);
+    results = Array.isArray(parsed.results) ? parsed.results : [];
+  } catch (error) {
+    results = recoverBatchResultEntries(text);
+    if (results.length === 0) throw error;
+  }
   const analyses: Array<{ filePath: string; analysis: LLMFileAnalysis }> = [];
-  for (const entry of parsed.results) {
+  for (const entry of results) {
     if (!entry || typeof entry !== "object") continue;
     const filePath = String((entry as { filePath?: unknown }).filePath || "");
     const response = (entry as { response?: unknown }).response;
@@ -572,6 +735,35 @@ function normalizeFileAnalysisObject(value: unknown): LLMFileAnalysis | null {
       ? (value as { languageNotes: string }).languageNotes
       : undefined,
   };
+}
+
+async function runSingleFileAnalysisFallback(
+  file: LlmAnalysisFile,
+  options: RunLlmFileAnalysisOptions & {
+    provider: LlmProvider;
+    policy: RetryPolicy;
+    model?: string;
+    artifacts: LlmArtifacts;
+  },
+): Promise<LLMFileAnalysis> {
+  const buildPrompt = options.core.buildFileAnalysisPrompt as (path: string, content: string, ctx: string) => string;
+  const parseResponse = options.core.parseFileAnalysisResponse as (response: string) => LLMFileAnalysis | null;
+  const content = options.readFile(`${options.analysisRoot}/${file.path}`);
+  const prompt = applyLanguageDirective(buildPrompt(file.path, content, options.projectContext), options.outputLanguage);
+  options.artifacts.promptStubs.push({ operation: "file-analysis", target: file.path, prompt });
+  return callWithRetry(
+    async () => {
+      const response = await options.provider.complete({ prompt, model: options.model, timeoutMs: options.timeoutMs });
+      const result = parseResponse(response.text);
+      if (!result) {
+        throw new LlmError("parse", `LLM parse failed for ${file.path}`);
+      }
+      return result as LLMFileAnalysis;
+    },
+    options.policy,
+    undefined,
+    options.retryDeps,
+  );
 }
 
 async function runBatchFileAnalysisTask(
@@ -633,6 +825,23 @@ async function runBatchFileAnalysisTask(
   const missingReason = missing.length > 0
     ? `LLM batch response missing file result: ${missing.map((file) => file.path).join(", ")}`
     : undefined;
+  const fallbackFailures: LlmFailureRecord[] = [];
+  if (!caught && missing.length > 0) {
+    for (const file of missing) {
+      try {
+        const analysis = await runSingleFileAnalysisFallback(file, options);
+        returned.add(file.path);
+        options.analyses.set(file.path, analysis);
+        options.stats.analyzed += 1;
+      } catch (error) {
+        fallbackFailures.push({
+          filePath: file.path,
+          reason: (error as Error).message,
+          kind: error instanceof LlmError ? error.kind : undefined,
+        });
+      }
+    }
+  }
   if (attemptLogs.length > 0) {
     options.artifacts.attemptJournal.push({
       scope: "file",
@@ -646,13 +855,14 @@ async function runBatchFileAnalysisTask(
   }
 
   if (!caught) {
-    if (missing.length > 0) {
+    if (fallbackFailures.length > 0) {
+      const fallbackReason = `LLM fallback file analysis failed: ${fallbackFailures.map((failure) => `${failure.filePath}: ${failure.reason}`).join("; ")}`;
       if (options.required) {
-        throw new LlmError("parse", missingReason!);
+        throw new LlmError("parse", fallbackReason);
       }
-      for (const file of missing) {
+      for (const failure of fallbackFailures) {
         options.stats.failed += 1;
-        options.stats.failures.push({ filePath: file.path, reason: "LLM batch response missing file result", attempts: attemptLogs });
+        options.stats.failures.push(failure);
       }
     }
     return { retryableFailure: false };

@@ -27,7 +27,7 @@ import { buildPhase2InputManifest, runBatchesPhase } from "./batches.js";
 import { writeBatchGraphFiles } from "./batch-graph.js";
 import { writeBatchGraphFilesSegmented } from "./batch-graph-segmented.js";
 import { decideBatchMode, type BatchMode } from "./batch-mode-decide.js";
-import { validatePhase2Checkpoint } from "./checkpoint.js";
+import { validatePhase2Checkpoint, validatePhase2ResumeCheckpoint } from "./checkpoint.js";
 import { currentGitDirty, currentGitHash } from "./git.js";
 import { mergeGraphPartialUpdate } from "./graph-update.js";
 import { augmentScanResultWithImportMap } from "./import-map.js";
@@ -78,6 +78,8 @@ export interface BuildPipelineDeps {
   runPartialUpdate?: (options: RunBuildModeOptions, deps?: BuildPipelineDeps) => Promise<RunBuildModeResult>;
   /** Test seam for checkpoint validation. */
   validateCheckpoint?: typeof validatePhase2Checkpoint;
+  /** Test seam for segmented mapper scheduling. */
+  runSegmentedBatchGraph?: typeof writeBatchGraphFilesSegmented;
 }
 
 export interface RunFullBuildOptions {
@@ -104,10 +106,8 @@ export interface RunFullBuildOptions {
   log?: BuildLog;
   /** C7 batch-mode selector (default: 'auto'). */
   batchMode?: BatchMode;
-  /** C7 batches per spawned mapper segment (segmented mode only). */
-  mapperBatchCount?: number;
   /** C7 parallel mapper segments (segmented mode only). */
-  mapperConcurrency?: number;
+  mappers?: number;
   /** C7 absolute CLI entry path; required by the segmented scheduler to spawn workers. */
   cliEntry?: string;
   /** C7 extra argv slice to append to each worker's --llm-* invocation. */
@@ -241,6 +241,61 @@ function writeAttemptJournal(
   const path = resolve(stateRoot, UA_DIR, "metrics", "llm-attempts.ndjson");
   mkdir(dirname(path), { recursive: true });
   write(path, `${entries.map((entry) => JSON.stringify(entry)).join("\n")}\n`, "utf8");
+}
+
+async function runGraphLlmEnhancementPhase(options: {
+  graph: any;
+  llm?: LlmBuildOptions;
+  runGraphLlm: typeof runLlmGraphEnhancement;
+  stateRoot: string;
+  projectName: string;
+  core: any;
+  outputLanguage: string;
+  mkdir: (path: string, options: { recursive: boolean }) => void;
+  write: (path: string, data: string, encoding: "utf8") => void;
+  log: BuildLog;
+}): Promise<{ graph: any; attemptEntries: LlmAttemptJournalEntry[] }> {
+  if (!options.llm?.enabled) return { graph: options.graph, attemptEntries: [] };
+
+  options.log("phase 4/4 llm graph enhancement");
+  const graphLlmRun = await options.runGraphLlm({
+    enabled: true,
+    required: options.llm.required,
+    graph: options.graph,
+    projectContext: options.projectName,
+    provider: options.llm.provider,
+    core: options.core,
+    timeoutMs: options.llm.timeoutMs,
+    retryPolicy: options.llm.retryPolicy,
+    modelCandidates: options.llm.modelCandidates,
+    outputLanguage: options.outputLanguage,
+  });
+  const graph = graphLlmRun.graph;
+  const llmDir = resolve(options.stateRoot, UA_DIR, "llm");
+  options.mkdir(llmDir, { recursive: true });
+  options.write(resolve(llmDir, "latest-graph-stats.json"), JSON.stringify(graphLlmRun.stats, null, 2), "utf8");
+  const promptFiles = writePromptStubs(options.stateRoot, graphLlmRun.artifacts?.promptStubs, options.mkdir, options.write);
+  if (Array.isArray(graph.layers) && graph.layers.length > 0) {
+    writeJsonArtifact(resolve(llmDir, "layers.json"), {
+      generatedAt: formatLocalTimestamp(),
+      promptFile: promptFiles.layers ?? null,
+      layers: graph.layers,
+    }, options.mkdir, options.write);
+  }
+  if (graph.project?.summary !== undefined) {
+    writeJsonArtifact(resolve(llmDir, "project-summary.json"), {
+      generatedAt: formatLocalTimestamp(),
+      promptFile: promptFiles["project-summary"] ?? null,
+      summary: graph.project.summary,
+      frameworks: Array.isArray(graph.project.frameworks) ? graph.project.frameworks : [],
+      tags: Array.isArray(graph.project.tags) ? graph.project.tags : [],
+    }, options.mkdir, options.write);
+  }
+
+  return {
+    graph,
+    attemptEntries: graphLlmRun.artifacts?.attemptJournal ?? [],
+  };
 }
 
 function buildEmbeddingText(node: Record<string, unknown>): string {
@@ -417,6 +472,8 @@ export async function runFullBuild(
         core,
         timeoutMs: options.llm.timeoutMs,
         retryPolicy: options.llm.retryPolicy,
+        globalConcurrency: options.llm.globalConcurrency,
+        qpmLimit: options.llm.qpmLimit,
         modelCandidates: options.llm.modelCandidates,
         modelCooldownMs: options.llm.modelCooldownMs,
         outputLanguage,
@@ -459,14 +516,13 @@ export async function runFullBuild(
       gitHash,
       scanRoot,
       pluginRoot: options.pluginRoot ?? null,
-      mapperBatchCount: Math.max(1, options.mapperBatchCount ?? 50),
-      mapperConcurrency: Math.max(1, options.mapperConcurrency ?? 1),
+      mappers: Math.max(1, options.mappers ?? 1),
       llm: options.llm?.enabled
         ? {
             enabled: true,
             extraArgs: options.llmWorkerArgs ?? [],
-            globalConcurrency: 1,
-            qpmLimit: 1,
+            globalConcurrency: Math.max(1, Math.floor(options.llm.globalConcurrency ?? 1)),
+            qpmLimit: Math.max(1, Math.floor(options.llm.qpmLimit ?? 1)),
           }
         : undefined,
       log,
@@ -490,43 +546,20 @@ export async function runFullBuild(
     outputLanguage,
     core,
   });
-  if (options.llm?.enabled) {
-    log("phase 4/4 llm graph enhancement");
-    const graphLlmRun = await runGraphLlm({
-      enabled: true,
-      required: options.llm.required,
-      graph,
-      projectContext: projectName,
-      provider: options.llm.provider,
-      core,
-      timeoutMs: options.llm.timeoutMs,
-      retryPolicy: options.llm.retryPolicy,
-      modelCandidates: options.llm.modelCandidates,
-      outputLanguage,
-    });
-    graph = graphLlmRun.graph;
-    const llmDir = resolve(stateRoot, UA_DIR, "llm");
-    mkdir(llmDir, { recursive: true });
-    write(resolve(llmDir, "latest-graph-stats.json"), JSON.stringify(graphLlmRun.stats, null, 2), "utf8");
-    const promptFiles = writePromptStubs(stateRoot, graphLlmRun.artifacts?.promptStubs, mkdir, write);
-    llmAttemptEntries.push(...(graphLlmRun.artifacts?.attemptJournal ?? []));
-    if (Array.isArray(graph.layers) && graph.layers.length > 0) {
-      writeJsonArtifact(resolve(llmDir, "layers.json"), {
-        generatedAt: formatLocalTimestamp(),
-        promptFile: promptFiles.layers ?? null,
-        layers: graph.layers,
-      }, mkdir, write);
-    }
-    if (graph.project?.summary !== undefined) {
-      writeJsonArtifact(resolve(llmDir, "project-summary.json"), {
-        generatedAt: formatLocalTimestamp(),
-        promptFile: promptFiles["project-summary"] ?? null,
-        summary: graph.project.summary,
-        frameworks: Array.isArray(graph.project.frameworks) ? graph.project.frameworks : [],
-        tags: Array.isArray(graph.project.tags) ? graph.project.tags : [],
-      }, mkdir, write);
-    }
-  }
+  const graphLlm = await runGraphLlmEnhancementPhase({
+    graph,
+    llm: options.llm,
+    runGraphLlm,
+    stateRoot,
+    projectName,
+    core,
+    outputLanguage,
+    mkdir,
+    write,
+    log,
+  });
+  graph = graphLlm.graph;
+  llmAttemptEntries.push(...graphLlm.attemptEntries);
   writeAttemptJournal(stateRoot, llmAttemptEntries, mkdir, write);
   const analyzedFiles = (scan.totalFiles as number) || graph.nodes.length;
 
@@ -704,7 +737,10 @@ export async function runResumeBuild(
   const resolveDirty = deps.resolveGitDirty ?? ((root: string) => currentGitDirty(root));
   const buildRegistry = deps.createRegistry ?? createAnalyzerRegistry;
   const ensureDirs = deps.ensureDirs ?? ensureBuildDirs;
-  const validateCheckpoint = deps.validateCheckpoint ?? validatePhase2Checkpoint;
+  const validateCheckpoint = deps.validateCheckpoint ?? validatePhase2ResumeCheckpoint;
+  const runSegmentedBatchGraph = deps.runSegmentedBatchGraph ?? writeBatchGraphFilesSegmented;
+  const runGraphLlm = deps.runLlmGraphEnhancement ?? runLlmGraphEnhancement;
+  const llmAttemptEntries: LlmAttemptJournalEntry[] = [];
 
   const projectRoot = resolve(options.projectRoot);
   const stateRoot = resolve(options.stateRoot ?? projectRoot);
@@ -733,10 +769,38 @@ export async function runResumeBuild(
 
   log("resume phase 2/4 analyze batches");
   const registry = await buildRegistry(core);
-  writeBatchGraphFiles(
-    { core, registry, analysisRoot: scanRoot, intermediateDir: paths.intermediateDir, batches: checkpoint.batches, outputLanguage, projectName, gitHash, log },
-    { readFileSync: read, writeFileSync: write },
-  );
+  const analyzeResumeBatches = async (batches: any[], includePaths?: string[]) => {
+    if (options.cliEntry) {
+      await runSegmentedBatchGraph({
+        cliEntry: options.cliEntry,
+        analysisRoot,
+        projectRoot,
+        intermediateDir: paths.intermediateDir,
+        batches: batches as Array<{ batchIndex: number | string; files?: Array<{ path: string }> }>,
+        includePaths,
+        outputLanguage,
+        projectName,
+        gitHash,
+        scanRoot,
+        pluginRoot: options.pluginRoot ?? null,
+        mappers: Math.max(1, options.mappers ?? 1),
+        llm: options.llm?.enabled
+          ? {
+              enabled: true,
+              extraArgs: options.llmWorkerArgs ?? [],
+              globalConcurrency: Math.max(1, Math.floor(options.llm.globalConcurrency ?? 1)),
+              qpmLimit: Math.max(1, Math.floor(options.llm.qpmLimit ?? 1)),
+            }
+          : undefined,
+        log,
+      });
+      return;
+    }
+    writeBatchGraphFiles(
+      { core, registry, analysisRoot: scanRoot, intermediateDir: paths.intermediateDir, batches, outputLanguage, projectName, gitHash, log },
+      { readFileSync: read, writeFileSync: write },
+    );
+  };
   if (buildKind === "incremental" || buildKind === "backfill") {
     if (!existsSync(statePaths.graphPath)) {
       throw new Error("build: resume rejected: partial resume requires an existing graph");
@@ -748,8 +812,10 @@ export async function runResumeBuild(
       throw new Error(`build: resume base graph mismatch: manifest=${baseGraphCommit || "<missing>"} current=${existingCommit || "<missing>"}`);
     }
     const changedFiles = Array.isArray(checkpoint.manifest.changedFiles) ? checkpoint.manifest.changedFiles : [];
+    const selectedBatches = selectBatchesForFiles(checkpoint.batches, changedFiles);
+    await analyzeResumeBatches(selectedBatches, changedFiles);
     const updateGraph = { nodes: [] as any[], edges: [] as any[] };
-    for (const batch of checkpoint.batches) {
+    for (const batch of selectedBatches) {
       const artifact = JSON.parse(read(resolve(paths.intermediateDir, `batch-${batch.batchIndex}.json`), "utf8"));
       updateGraph.nodes.push(...(Array.isArray(artifact.nodes) ? artifact.nodes : []));
       updateGraph.edges.push(...(Array.isArray(artifact.edges) ? artifact.edges : []));
@@ -760,13 +826,29 @@ export async function runResumeBuild(
     return { graph: validatedGraph, gitHash, analyzedFiles: changedFiles.length, paths, mode: "resume", updatedFiles: changedFiles };
   }
 
+  await analyzeResumeBatches(checkpoint.batches);
   runMergePhase({ skillDir, analysisRoot, log }, { execFileSync });
 
   if (!existsSync(paths.assembledPath)) {
     throw new Error(`build: merge phase did not produce ${paths.assembledPath}`);
   }
   const assembled = JSON.parse(read(paths.assembledPath, "utf8"));
-  const graph = wrapAsKnowledgeGraph({ scan, assembled, projectName, gitHash, outputLanguage, core });
+  let graph = wrapAsKnowledgeGraph({ scan, assembled, projectName, gitHash, outputLanguage, core });
+  const graphLlm = await runGraphLlmEnhancementPhase({
+    graph,
+    llm: options.llm,
+    runGraphLlm,
+    stateRoot,
+    projectName,
+    core,
+    outputLanguage,
+    mkdir,
+    write,
+    log,
+  });
+  graph = graphLlm.graph;
+  llmAttemptEntries.push(...graphLlm.attemptEntries);
+  writeAttemptJournal(stateRoot, llmAttemptEntries, mkdir, write);
   const analyzedFiles = (scan.totalFiles as number) || graph.nodes.length;
   const validatedGraph = persistValidatedGraph(core, stateRoot, graph, gitHash, analyzedFiles, outputLanguage, excludeTests);
   await writeEmbeddingsArtifact(stateRoot, validatedGraph, options.embedding, mkdir, write, log);
@@ -914,7 +996,7 @@ export async function runPartialBuildUpdate(
         baseGraphCommit,
         changedFiles: affectedFiles,
         log,
-      }, { readFileSync: (p) => read(p, "utf8"), currentGitDirty: deps.resolveGitDirty }, selectedBatches);
+      }, { readFileSync: (p) => read(p, "utf8"), currentGitDirty: deps.resolveGitDirty }, batches);
       write(paths.phase2ManifestPath, JSON.stringify(manifest, null, 2), "utf8");
       writeBatchGraphFiles(
         { core, registry, analysisRoot, intermediateDir: paths.intermediateDir, batches: selectedBatches, outputLanguage, projectName, gitHash, log },
@@ -994,7 +1076,7 @@ export async function runPartialBuildUpdate(
     baseGraphCommit,
     changedFiles: affectedFiles,
     log,
-  }, { readFileSync: (p) => read(p, "utf8"), currentGitDirty: deps.resolveGitDirty }, selectedBatches);
+  }, { readFileSync: (p) => read(p, "utf8"), currentGitDirty: deps.resolveGitDirty }, checkpoint.batches);
   write(paths.phase2ManifestPath, JSON.stringify(manifest, null, 2), "utf8");
   if (!registry) registry = await buildRegistry(core);
   writeBatchGraphFiles(

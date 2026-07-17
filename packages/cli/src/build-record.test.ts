@@ -42,7 +42,6 @@ const sheetsConfig: RecordSection = {
       appId: "cli_x",
       appSecret: "secret_x",
       spreadsheetToken: "shtTOKEN",
-      mappings: { "user-event": { worksheet: "user-event", columns: ["eventType"] } },
     },
   },
 };
@@ -82,7 +81,7 @@ describe("buildRecordProvider", () => {
     expect(provider).toBeInstanceOf(CompositeRecordProvider);
   });
 
-  it("rejects feishu-sheets config missing token/mappings", async () => {
+  it("rejects feishu-sheets config missing token", async () => {
     await expect(
       buildRecordProvider(serveArgs({ recordProviders: ["feishu-sheets"] }), {
         stateRoot: "/state",

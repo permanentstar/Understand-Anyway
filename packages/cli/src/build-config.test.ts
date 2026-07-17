@@ -19,15 +19,15 @@ function args(overrides: Partial<BuildArgs> = {}): BuildArgs {
     llmProfile: null,
     embeddingProvider: null,
     llmRequired: null,
-    llmModelCandidates: [],
     llmRetry: {
       maxAttempts: null,
       initialBackoffMs: null,
       maxBackoffMs: null,
     },
     batchMode: "auto",
-    mapperBatchCount: null,
-    mapperConcurrency: null,
+    mappers: null,
+    llmConcurrencyPerMapper: null,
+    llmQpmLimit: null,
     ...overrides,
   };
 }
@@ -56,11 +56,11 @@ describe("resolveBuildConfig", () => {
       outputLanguage: "en",
       llmAnalysis: false,
       llmRequired: false,
-      llmModelCandidates: [],
       llmRetryPolicy: DEFAULT_RETRY_POLICY,
       batchMode: "auto",
-      mapperBatchCount: 50,
-      mapperConcurrency: 1,
+      mappers: 1,
+      llmConcurrencyPerMapper: 1,
+      llmQpmLimit: 1,
     });
   });
 
@@ -91,7 +91,8 @@ describe("resolveBuildConfig", () => {
             excludeTests: true,
             llmAnalysis: true,
             llmRequired: false,
-            llmModelCandidates: ["small"],
+            llmConcurrencyPerMapper: 2,
+            llmQpmLimit: 4,
           },
         },
         prod: {
@@ -101,7 +102,6 @@ describe("resolveBuildConfig", () => {
             excludeTests: true,
             llmAnalysis: true,
             llmRequired: true,
-            llmModelCandidates: ["large"],
           },
         },
       },
@@ -110,7 +110,8 @@ describe("resolveBuildConfig", () => {
     expect(resolved.outputLanguage).toBe("zh");
     expect(resolved.llmAnalysis).toBe(true);
     expect(resolved.llmRequired).toBe(false);
-    expect(resolved.llmModelCandidates).toEqual(["small"]);
+    expect(resolved.llmConcurrencyPerMapper).toBe(2);
+    expect(resolved.llmQpmLimit).toBe(4);
   });
 
   it("throws for an unknown deploy profile", () => {
@@ -157,13 +158,23 @@ describe("resolveBuildConfig", () => {
     expect(resolved.includePaths).toEqual([]);
   });
 
-  it("resolves llm flags from deploy profile build defaults", () => {
+  it("resolves llm required and budget from deploy profile build defaults", () => {
     const resolved = resolveBuildConfig(args({ deployProfile: "llm-nightly" }), {
-      deployProfiles: { "llm-nightly": { build: { llmAnalysis: true, llmRequired: false, llmModelCandidates: ["small", "large"] } } },
+      deployProfiles: {
+        "llm-nightly": {
+          build: {
+            llmAnalysis: true,
+            llmRequired: true,
+            llmConcurrencyPerMapper: 4,
+            llmQpmLimit: 8,
+          },
+        },
+      },
     });
     expect(resolved.llmAnalysis).toBe(true);
-    expect(resolved.llmRequired).toBe(false);
-    expect(resolved.llmModelCandidates).toEqual(["small", "large"]);
+    expect(resolved.llmRequired).toBe(true);
+    expect(resolved.llmConcurrencyPerMapper).toBe(4);
+    expect(resolved.llmQpmLimit).toBe(8);
   });
 
   it("lets CLI llm flags override config", () => {
@@ -252,59 +263,76 @@ describe("resolveBuildConfig", () => {
 
   it("auto-defaults mapper sizes from host tier (small host -> 50/1)", () => {
     const resolved = resolveBuildConfig(args(), {}, { env: {}, ...tinyHostDeps });
-    expect(resolved.mapperBatchCount).toBe(50);
-    expect(resolved.mapperConcurrency).toBe(1);
+    expect(resolved.mappers).toBe(1);
   });
 
   it("auto-defaults mapper sizes from host tier (big host -> 100/4)", () => {
     const resolved = resolveBuildConfig(args(), {}, { env: {}, ...bigHostDeps });
-    expect(resolved.mapperBatchCount).toBe(100);
-    expect(resolved.mapperConcurrency).toBe(4);
+    expect(resolved.mappers).toBe(4);
   });
 
   it("CLI batch-mode tuning overrides config and host defaults", () => {
     const resolved = resolveBuildConfig(
-      args({ deployProfile: "prod", batchMode: "segmented", mapperBatchCount: 7, mapperConcurrency: 3 }),
+      args({ deployProfile: "prod", batchMode: "segmented", mappers: 3, llmConcurrencyPerMapper: 2, llmQpmLimit: 30 }),
       {
-        deployProfiles: { prod: { build: { batchMode: "full", mapperBatchCount: 20, mapperConcurrency: 2 } } },
+        deployProfiles: { prod: { build: { batchMode: "full", mappers: 2, llmConcurrencyPerMapper: 1, llmQpmLimit: 10 } } },
       },
       { env: {}, ...bigHostDeps },
     );
     expect(resolved.batchMode).toBe("segmented");
-    expect(resolved.mapperBatchCount).toBe(7);
-    expect(resolved.mapperConcurrency).toBe(3);
+    expect(resolved.mappers).toBe(3);
+    expect(resolved.llmConcurrencyPerMapper).toBe(2);
+    expect(resolved.llmQpmLimit).toBe(30);
   });
 
-  it("UA_MAPPER_* env overrides YAML but loses to CLI flags", () => {
+  it("UA_MAPPERS env overrides YAML but loses to CLI flags", () => {
     const resolved = resolveBuildConfig(
-      args({ deployProfile: "prod", mapperBatchCount: 9, mapperConcurrency: null }),
+      args({ deployProfile: "prod", mappers: null }),
       {
-        deployProfiles: { prod: { build: { mapperBatchCount: 25, mapperConcurrency: 2 } } },
+        deployProfiles: { prod: { build: { mappers: 2 } } },
       },
       {
-        env: { UA_MAPPER_BATCH_COUNT: "11", UA_MAPPER_CONCURRENCY: "5" },
+        env: { UA_MAPPERS: "5" },
         ...tinyHostDeps,
       },
     );
-    expect(resolved.mapperBatchCount).toBe(9); // CLI wins
-    expect(resolved.mapperConcurrency).toBe(5); // env > YAML
+    expect(resolved.mappers).toBe(5);
   });
 
-  it("YAML deploy profile batchMode/mapper sizes are picked up when CLI is unset", () => {
+  it("UA_LLM_BUDGET env overrides YAML llm budget", () => {
+    const resolved = resolveBuildConfig(
+      args({ deployProfile: "prod" }),
+      {
+        deployProfiles: { prod: { build: { llmConcurrencyPerMapper: 2, llmQpmLimit: 4 } } },
+      },
+      {
+        env: { UA_LLM_CONCURRENCY_PER_MAPPER: "5", UA_LLM_QPM_LIMIT: "10" },
+        ...tinyHostDeps,
+      },
+    );
+    expect(resolved.llmConcurrencyPerMapper).toBe(5);
+    expect(resolved.llmQpmLimit).toBe(10);
+  });
+
+  it("YAML deploy profile batchMode/mappers are picked up when CLI is unset", () => {
     const resolved = resolveBuildConfig(args({ deployProfile: "prod" }), {
-      deployProfiles: { prod: { build: { batchMode: "segmented", mapperBatchCount: 16, mapperConcurrency: 2 } } },
+      deployProfiles: { prod: { build: { batchMode: "segmented", mappers: 2 } } },
     }, { env: {}, ...tinyHostDeps });
     expect(resolved.batchMode).toBe("segmented");
-    expect(resolved.mapperBatchCount).toBe(16);
-    expect(resolved.mapperConcurrency).toBe(2);
+    expect(resolved.mappers).toBe(2);
   });
 
-  it("rejects invalid mapper YAML values", () => {
+  it("rejects invalid mapper/LLM YAML values", () => {
     expect(() =>
       resolveBuildConfig(args({ deployProfile: "bad" }), {
-        deployProfiles: { bad: { build: { mapperBatchCount: 0 } } },
+        deployProfiles: { bad: { build: { mappers: 0 } } },
       }, { env: {}, ...tinyHostDeps }),
-    ).toThrow(/mapperBatchCount/);
+    ).toThrow(/mappers/);
+    expect(() =>
+      resolveBuildConfig(args({ deployProfile: "bad" }), {
+        deployProfiles: { bad: { build: { llmConcurrencyPerMapper: 0 } } },
+      }, { env: {}, ...tinyHostDeps }),
+    ).toThrow(/llmConcurrencyPerMapper/);
     expect(() =>
       resolveBuildConfig(args({ deployProfile: "bad" }), {
         deployProfiles: { bad: { build: { batchMode: "turbo" as unknown as "auto" } } },

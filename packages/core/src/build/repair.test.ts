@@ -184,9 +184,10 @@ describe("repairLlmFailures", () => {
     const { core, saved } = makeCore();
     const { writes, deps } = makeFixture({ withStats: false });
     const runLlm = vi.fn();
+    const logs: string[] = [];
 
     const result = await repairLlmFailures(
-      { core, projectRoot: STATE, stateRoot: STATE, llm: { provider: {} as any }, log: () => {} },
+      { core, projectRoot: STATE, stateRoot: STATE, llm: { provider: {} as any }, log: (line) => logs.push(line) },
       { ...deps, runLlmFileAnalysis: runLlm as any },
     );
 
@@ -195,6 +196,7 @@ describe("repairLlmFailures", () => {
     expect(result.requested).toBe(0);
     expect(result.repaired).toBe(0);
     expect(writes[REPORT_PATH]).toBeDefined();
+    expect(logs.join("\n")).toContain("build --resume");
   });
 
   it("fails fast when no provider is configured (non-dry-run)", async () => {

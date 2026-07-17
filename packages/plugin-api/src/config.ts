@@ -22,16 +22,16 @@ export interface BuildConfig {
   llmAnalysis?: boolean;
   /** Stable toggle: fail the build when LLM analysis fails. Default false. */
   llmRequired?: boolean;
-  /** Ordered model candidates for provider requests. Omitted = provider default. */
-  llmModelCandidates?: string[];
   /** Transient-retry policy around a single LLM call (C8). Defaults to DEFAULT_RETRY_POLICY. */
   llmRetry?: LlmRetryConfig;
+  /** LLM call concurrency budget inside each mapper worker. Omitted = 1. */
+  llmConcurrencyPerMapper?: number;
+  /** Global LLM QPM budget for segmented mapper workers. Omitted = 1. */
+  llmQpmLimit?: number;
   /** Phase 2 batch-mode (C7). `auto` falls back to fixture-size based decision. */
   batchMode?: "auto" | "full" | "segmented";
-  /** Batches per spawned mapper segment (C7). Omitted = host-aware default. */
-  mapperBatchCount?: number;
-  /** Parallel mapper segments (C7). Omitted = host-aware default. */
-  mapperConcurrency?: number;
+  /** Parallel mapper processes (C7). Omitted = host-aware default. */
+  mappers?: number;
 }
 
 /** Stable transient-retry tuning (C8). Omitted fields fall back to defaults. */

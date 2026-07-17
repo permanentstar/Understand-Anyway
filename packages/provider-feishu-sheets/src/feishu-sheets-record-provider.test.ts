@@ -74,7 +74,67 @@ function envelope(kind: RecordEnvelope["kind"], payload: Record<string, unknown>
 
 describe("FeishuSheetsRecordProvider", () => {
   it("requires a spreadsheet token", () => {
-    expect(() => new FeishuSheetsRecordProvider({ appId: "x", appSecret: "y", spreadsheetToken: "", mappings: {} })).toThrow(/spreadsheetToken/);
+    expect(() => new FeishuSheetsRecordProvider({ appId: "x", appSecret: "y", spreadsheetToken: "" })).toThrow(/spreadsheetToken/);
+  });
+
+  it("uses built-in worksheet names and legacy headers for standard record kinds by default", async () => {
+    const calls: Call[] = [];
+    const p = new FeishuSheetsRecordProvider({
+      appId: "cli_x",
+      appSecret: "secret_x",
+      spreadsheetToken: "shtTOKEN",
+      fetchImpl: fakeFeishu(calls, {
+        sheets: [
+          { sheetId: "shtUE", title: "user-event" },
+          { sheetId: "shtNU", title: "nightly-update" },
+          { sheetId: "shtPU", title: "project-update" },
+        ],
+      }),
+    });
+
+    await p.write(envelope("user-event", { eventId: "evt-1", eventType: "login" }));
+    await p.write(envelope("nightly-update", { runId: "run-1", overallStatus: "success" }));
+    await p.write(envelope("project-update", { runId: "run-1", project: "alpha" }));
+
+    const headerPuts = calls.filter((c) => c.method === "PUT" && c.url.endsWith("/values"));
+    expect(headerPuts.map((c) => (c.body as { valueRange: { range: string } }).valueRange.range)).toEqual([
+      "shtUE!A1:Q1",
+      "shtNU!A1:K1",
+      "shtPU!A1:AO1",
+    ]);
+    expect((headerPuts[0]!.body as { valueRange: { values: string[][] } }).valueRange.values[0]).toEqual([
+      "eventId",
+      "eventTime",
+      "eventType",
+      "sessionId",
+      "userName",
+      "userEnName",
+      "openId",
+      "email",
+      "authReason",
+      "departmentPaths",
+      "sourceIp",
+      "userAgent",
+      "targetType",
+      "targetId",
+      "targetName",
+      "targetUrl",
+      "extra",
+    ]);
+    expect((headerPuts[1]!.body as { valueRange: { values: string[][] } }).valueRange.values[0]).toEqual([
+      "runId",
+      "startedAt",
+      "finishedAt",
+      "overallStatus",
+      "projectCount",
+      "successCount",
+      "failedCount",
+      "buildSuccessCount",
+      "recordProvider",
+      "recordStatus",
+      "resultJson",
+    ]);
+    expect((headerPuts[2]!.body as { valueRange: { values: string[][] } }).valueRange.values[0]).toHaveLength(41);
   });
 
   it("appends a mapped row resolving dotted payload paths", async () => {
@@ -273,9 +333,9 @@ describe("FeishuSheetsRecordProvider", () => {
     ]);
   });
 
-  it("skips kinds without a mapping (no API calls)", async () => {
+  it("skips non-standard kinds without a mapping (no API calls)", async () => {
     const calls: Call[] = [];
-    await provider(calls).write(envelope("nightly-update", { runId: "r1" }));
+    await provider(calls).write(envelope("system-config", { key: "x" }));
     expect(calls).toHaveLength(0);
   });
 

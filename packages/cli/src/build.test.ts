@@ -22,15 +22,15 @@ function baseArgs(overrides: Partial<BuildArgs> = {}): BuildArgs {
     llmProfile: null,
     embeddingProvider: null,
     llmRequired: null,
-    llmModelCandidates: [],
     llmRetry: {
       maxAttempts: null,
       initialBackoffMs: null,
       maxBackoffMs: null,
     },
     batchMode: "auto",
-    mapperBatchCount: null,
-    mapperConcurrency: null,
+    mappers: null,
+    llmConcurrencyPerMapper: null,
+    llmQpmLimit: null,
     ...overrides,
   };
 }
@@ -298,6 +298,60 @@ describe("runBuild", () => {
       required: true,
       provider,
     });
+  });
+
+  it("passes provider-profile model candidates and llm budget to core and worker args", async () => {
+    const bootstrap = vi.fn().mockResolvedValue({ pluginRoot: "/p", skillDir: "/p/s", core: {} });
+    const runBuildPipeline = vi.fn().mockResolvedValue({
+      graph: { nodes: [], edges: [] },
+      gitHash: "abc",
+      analyzedFiles: 0,
+      paths: { stateRoot: repo },
+    });
+    const assertLlmContract = vi.fn();
+    const provider = { name: "fake-llm", complete: vi.fn() };
+    const buildLlm = vi.fn().mockResolvedValue(provider);
+
+    await runBuild(baseArgs({ llmAnalysis: true, llmProfile: "traex", deployProfile: "prod" }), {
+      log: () => {},
+      deps: {
+        bootstrap,
+        assertLlmContract,
+        runBuild: runBuildPipeline,
+        loadConfig: () => ({
+          llmProfiles: {
+            traex: {
+              package: "@understand-anyway/provider-trae-cli-v2",
+              config: {
+                command: "traex",
+                modelCandidates: ["Qwen3.6-Plus", "Qwen3.6-Max"],
+              },
+            },
+          },
+          deployProfiles: {
+            prod: {
+              build: {
+                mappers: 4,
+                llmConcurrencyPerMapper: 4,
+                llmQpmLimit: 30,
+              },
+            },
+          },
+        }),
+        buildLlmProvider: buildLlm,
+        resolveProjectContext: () => fakeCtx(repo, repo),
+      },
+    });
+
+    const pipelineArgs = runBuildPipeline.mock.calls[0]![0];
+    expect(pipelineArgs.llm).toMatchObject({
+      modelCandidates: ["Qwen3.6-Plus", "Qwen3.6-Max"],
+      globalConcurrency: 16,
+      qpmLimit: 30,
+    });
+    expect(pipelineArgs.llmWorkerArgs).toContain("--llm-provider-model-candidates");
+    expect(pipelineArgs.llmWorkerArgs).toContain("Qwen3.6-Plus,Qwen3.6-Max");
+    expect(pipelineArgs.llmWorkerArgs).not.toContain("--llm-model-candidates");
   });
 
   it("loads embedding provider and passes it to core when configured", async () => {

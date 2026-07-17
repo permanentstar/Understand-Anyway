@@ -156,10 +156,10 @@ describe("validateDeployConfig", () => {
     expect(validateDeployConfig(cfg).valid).toBe(true);
   });
 
-  it("accepts llmModelCandidates", () => {
+  it("rejects build-level llmModelCandidates", () => {
     const cfg = valid();
     (profile(cfg).build as Record<string, unknown>).llmModelCandidates = ["small", "large"];
-    expect(validateDeployConfig(cfg).valid).toBe(true);
+    expect(validateDeployConfig(cfg).valid).toBe(false);
   });
 
   it("accepts a notify provider block", () => {
@@ -193,8 +193,9 @@ describe("validateDeployConfig", () => {
     const cfg = valid();
     Object.assign(profile(cfg).build as Record<string, unknown>, {
       batchMode: "segmented",
-      mapperBatchCount: 25,
-      mapperConcurrency: 4,
+      mappers: 4,
+      llmConcurrencyPerMapper: 4,
+      llmQpmLimit: 30,
     });
     expect(validateDeployConfig(cfg).valid).toBe(true);
   });
@@ -204,7 +205,10 @@ describe("validateDeployConfig", () => {
     (profile(cfg).build as Record<string, unknown>).batchMode = "turbo";
     expect(validateDeployConfig(cfg).valid).toBe(false);
     const cfg2 = valid();
-    (profile(cfg2).build as Record<string, unknown>).mapperBatchCount = 0;
+    (profile(cfg2).build as Record<string, unknown>).mappers = 0;
     expect(validateDeployConfig(cfg2).valid).toBe(false);
+    const cfg3 = valid();
+    (profile(cfg3).build as Record<string, unknown>).llmConcurrencyPerMapper = 0;
+    expect(validateDeployConfig(cfg3).valid).toBe(false);
   });
 });

@@ -8,9 +8,9 @@ import { FeishuSheetsClient, type FeishuSheetsClientOptions } from "./feishu-she
  */
 export interface SheetKindMapping {
   /** Worksheet title within the spreadsheet. */
-  worksheet: string;
+  worksheet?: string;
   /** Ordered payload keys for initializing a blank sheet's header row. */
-  columns: string[];
+  columns?: string[];
   /**
    * Explicit source-path overrides keyed by the on-sheet header column name.
    * Used to keep writing into historical schemas after field renames.
@@ -18,13 +18,111 @@ export interface SheetKindMapping {
   aliases?: Partial<Record<string, string | string[]>>;
 }
 
+interface ResolvedSheetKindMapping {
+  worksheet: string;
+  columns: string[];
+  aliases?: SheetKindMapping["aliases"];
+}
+
 export interface FeishuSheetsRecordProviderOptions extends FeishuSheetsClientOptions {
   /** Spreadsheet token (document id) the worksheets live in. */
   spreadsheetToken: string;
-  /** Worksheet + column mapping per record kind. Kinds without a mapping are skipped. */
-  mappings: Partial<Record<RecordKind, SheetKindMapping>>;
+  /**
+   * Optional worksheet title overrides. For the three built-in record kinds,
+   * omitted values default to the record kind itself.
+   */
+  worksheets?: Partial<Record<RecordKind | "nightly" | "project", string>>;
+  /**
+   * Optional worksheet + column mapping per record kind. Built-in record kinds
+   * are provided by default; custom kinds without a mapping are skipped.
+   */
+  mappings?: Partial<Record<RecordKind, SheetKindMapping>>;
   log?: (message: string) => void;
 }
+
+export const USER_EVENT_COLUMNS = [
+  "eventId",
+  "eventTime",
+  "eventType",
+  "sessionId",
+  "userName",
+  "userEnName",
+  "openId",
+  "email",
+  "authReason",
+  "departmentPaths",
+  "sourceIp",
+  "userAgent",
+  "targetType",
+  "targetId",
+  "targetName",
+  "targetUrl",
+  "extra",
+] as const;
+
+export const NIGHTLY_UPDATE_COLUMNS = [
+  "runId",
+  "startedAt",
+  "finishedAt",
+  "overallStatus",
+  "projectCount",
+  "successCount",
+  "failedCount",
+  "buildSuccessCount",
+  "recordProvider",
+  "recordStatus",
+  "resultJson",
+] as const;
+
+export const PROJECT_UPDATE_COLUMNS = [
+  "runId",
+  "startedAt",
+  "finishedAt",
+  "project",
+  "repoPath",
+  "stateDir",
+  "overallStatus",
+  "buildStatus",
+  "gateStatus",
+  "gateApproved",
+  "gateFailureReason",
+  "criticalCount",
+  "warningCount",
+  "needsManualIntervention",
+  "commitBefore",
+  "commitAfter",
+  "nodeCount",
+  "edgeCount",
+  "containsEdges",
+  "importsEdges",
+  "callsEdges",
+  "fileNodeCount",
+  "missingFileCount",
+  "moduleStatus",
+  "llmEnabled",
+  "llmStatus",
+  "llmProvider",
+  "llmModel",
+  "llmRequests",
+  "llmTasks",
+  "llmProcessedTasks",
+  "llmFailures",
+  "llmTimeouts",
+  "llmCandidateFiles",
+  "llmProcessedFiles",
+  "llmBreakerTripped",
+  "llmEnrichedNodes",
+  "resultJson",
+  "buildLog",
+  "gateJson",
+  "gateLog",
+] as const;
+
+const DEFAULT_COLUMNS: Partial<Record<RecordKind, readonly string[]>> = {
+  "user-event": USER_EVENT_COLUMNS,
+  "nightly-update": NIGHTLY_UPDATE_COLUMNS,
+  "project-update": PROJECT_UPDATE_COLUMNS,
+};
 
 function resolvePath(payload: Record<string, unknown>, path: string): unknown {
   if (!path.includes(".")) return payload[path];
@@ -87,7 +185,7 @@ function normalizeAliases(
   return normalized;
 }
 
-function mergeAliases(kind: RecordKind, mapping: SheetKindMapping): Record<string, string[]> {
+function mergeAliases(kind: RecordKind, mapping: ResolvedSheetKindMapping): Record<string, string[]> {
   return {
     ...(BUILTIN_HEADER_ALIASES[kind] ?? {}),
     ...normalizeAliases(mapping.aliases),
@@ -112,7 +210,7 @@ function renderColumnCell(column: string, value: unknown): string {
   return renderCell(value);
 }
 
-function buildRow(record: RecordEnvelope, header: readonly string[], mapping: SheetKindMapping): string[] {
+function buildRow(record: RecordEnvelope, header: readonly string[], mapping: ResolvedSheetKindMapping): string[] {
   const aliases = mergeAliases(record.kind, mapping);
   return header.map((column) => {
     const candidates = [...(aliases[column] ?? []), column];
@@ -124,23 +222,62 @@ function buildRow(record: RecordEnvelope, header: readonly string[], mapping: Sh
   });
 }
 
+function resolveWorksheetOverride(
+  kind: RecordKind,
+  worksheets: FeishuSheetsRecordProviderOptions["worksheets"],
+): string | undefined {
+  if (!worksheets) return undefined;
+  const direct = worksheets[kind];
+  if (direct) return direct;
+  if (kind === "nightly-update") return worksheets.nightly;
+  if (kind === "project-update") return worksheets.project;
+  return undefined;
+}
+
+function resolveMappings(options: FeishuSheetsRecordProviderOptions): Map<RecordKind, ResolvedSheetKindMapping> {
+  const configured = options.mappings ?? {};
+  const kinds = new Set<RecordKind>([
+    "user-event",
+    "nightly-update",
+    "project-update",
+    ...Object.keys(configured),
+  ] as RecordKind[]);
+  const resolved = new Map<RecordKind, ResolvedSheetKindMapping>();
+  for (const kind of kinds) {
+    const mapping = configured[kind];
+    const defaultColumns = DEFAULT_COLUMNS[kind];
+    const columns = Array.isArray(mapping?.columns) && mapping.columns.length > 0
+      ? mapping.columns.map(String)
+      : defaultColumns
+        ? [...defaultColumns]
+        : undefined;
+    if (!columns) continue;
+    resolved.set(kind, {
+      worksheet: String(mapping?.worksheet || resolveWorksheetOverride(kind, options.worksheets) || kind),
+      columns,
+      aliases: mapping?.aliases,
+    });
+  }
+  return resolved;
+}
+
 export class FeishuSheetsRecordProvider implements RecordProvider {
   readonly name = "feishu-sheets";
   private readonly client: FeishuSheetsClient;
   private readonly spreadsheetToken: string;
-  private readonly mappings: Partial<Record<RecordKind, SheetKindMapping>>;
+  private readonly mappings: Map<RecordKind, ResolvedSheetKindMapping>;
   private readonly log: (message: string) => void;
 
   constructor(options: FeishuSheetsRecordProviderOptions) {
     if (!options.spreadsheetToken) throw new Error("FeishuSheetsRecordProvider requires spreadsheetToken");
     this.client = new FeishuSheetsClient(options);
     this.spreadsheetToken = options.spreadsheetToken;
-    this.mappings = options.mappings;
+    this.mappings = resolveMappings(options);
     this.log = options.log ?? (() => {});
   }
 
   async write(record: RecordEnvelope): Promise<void> {
-    const mapping = this.mappings[record.kind];
+    const mapping = this.mappings.get(record.kind);
     if (!mapping) return;
     try {
       const worksheet = await this.client.ensureWorksheet(this.spreadsheetToken, mapping.worksheet);

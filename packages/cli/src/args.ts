@@ -83,18 +83,18 @@ export interface BuildArgs {
   llmProfile: string | null;
   /** Provider package name for semantic embeddings. Null = unset. */
   embeddingProvider: string | null;
-  /** Ordered model candidates for provider requests. Empty = provider default. */
-  llmModelCandidates: string[];
   /** Fail the build on LLM provider/parse failures. Null = unset (defers to config/default off). */
   llmRequired: boolean | null;
   /** CLI-supplied retry policy overrides for the LLM call. Null fields = defer to config/defaults. */
   llmRetry: LlmRetryArgs;
   /** Phase 2 batch-mode selector. */
   batchMode: BatchMode;
-  /** Batches per spawned mapper segment. Null = host-aware default (auto only). */
-  mapperBatchCount: number | null;
-  /** Parallel mapper segments. Null = host-aware default (auto only). */
-  mapperConcurrency: number | null;
+  /** Parallel mapper processes. Null = host-aware default. */
+  mappers: number | null;
+  /** LLM concurrency budget inside each mapper. Null = config/default. */
+  llmConcurrencyPerMapper: number | null;
+  /** Global LLM task start rate per minute. Null = config/default. */
+  llmQpmLimit: number | null;
 }
 
 export interface LlmRetryArgs {
@@ -421,11 +421,11 @@ build options:
   --project <id>        Project id registered through \`init\` (required). The CLI
                         resolves repo + stateRoot through <projectsRoot>/gateway/config/projects.json.
   --incremental         Incremental update only; never falls back to full implicitly
-  --resume              Resume from existing Phase 2 checkpoint
+  --resume              Resume Phase 2 from existing scan/batches; reuses completed batch artifacts and fills missing ones
   --backfill            Repair missing/current files via explicit --include or auto-detect
   --include <path>      Optional include path for --backfill (repeatable)
   --config <file|dir>   Unified YAML deploy config; discovered if omitted
-  --deploy-profile <p>  Apply deployProfiles.<p>.build defaults (ppe=small, prod=large)
+  --deploy-profile <p>  Apply deployProfiles.<p>.build defaults
   --llm-profile <name>  Apply llmProfiles.<name> provider config
   --exclude-tests       Filter test files out of the graph (default)
   --include-tests       Keep test files in the graph
@@ -437,8 +437,9 @@ build options:
   --llm-required        Fail the build on LLM provider/parse failures (default: best-effort)
   --llm-retry-max-attempts <n>      Max attempts incl. first try (default: 3 from config; 1 = no retry)
   --batch-mode <auto|full|segmented>  Phase 2 strategy (default: auto)
-  --mapper-batch-count <n>          Batches per spawned mapper segment (default: host-aware)
-  --mapper-concurrency <n>          Parallel mapper segments (default: host-aware)
+  --mappers <n>                    Parallel mapper processes (default: host-aware)
+  --llm-concurrency-per-mapper <n> LLM calls allowed inside each mapper
+  --llm-qpm-limit <n>              Global LLM task start rate per minute
   --no-dashboard       Accepted for deploy-script compatibility; build never starts a dashboard
 
 compat options:
@@ -658,12 +659,12 @@ function parseBuildArgs(rest: string[]): ParsedArgs {
   let llmProvider: string | null = null;
   let llmProfile: string | null = null;
   let embeddingProvider: string | null = null;
-  let llmModelCandidates: string[] = [];
   let llmRequired: boolean | null = null;
   let retryMaxAttempts: number | null = null;
   let batchMode: BatchMode = "auto";
-  let mapperBatchCount: number | null = null;
-  let mapperConcurrency: number | null = null;
+  let mappers: number | null = null;
+  let llmConcurrencyPerMapper: number | null = null;
+  let llmQpmLimit: number | null = null;
 
   for (let i = 0; i < rest.length; i += 1) {
     const arg = rest[i];
@@ -720,9 +721,6 @@ function parseBuildArgs(rest: string[]): ParsedArgs {
       case "--embedding-provider":
         embeddingProvider = takeValue(arg, rest[++i]);
         break;
-      case "--llm-model-candidates":
-        llmModelCandidates = parseCsvList(takeValue(arg, rest[++i]));
-        break;
       case "--llm-required":
         llmRequired = true;
         break;
@@ -732,11 +730,14 @@ function parseBuildArgs(rest: string[]): ParsedArgs {
       case "--batch-mode":
         batchMode = parseBatchMode(arg, takeValue(arg, rest[++i]));
         break;
-      case "--mapper-batch-count":
-        mapperBatchCount = parseRetryInt(arg, takeValue(arg, rest[++i]), { min: 1 });
+      case "--mappers":
+        mappers = parseRetryInt(arg, takeValue(arg, rest[++i]), { min: 1 });
         break;
-      case "--mapper-concurrency":
-        mapperConcurrency = parseRetryInt(arg, takeValue(arg, rest[++i]), { min: 1 });
+      case "--llm-concurrency-per-mapper":
+        llmConcurrencyPerMapper = parseRetryInt(arg, takeValue(arg, rest[++i]), { min: 1 });
+        break;
+      case "--llm-qpm-limit":
+        llmQpmLimit = parseRetryInt(arg, takeValue(arg, rest[++i]), { min: 1 });
         break;
       case "--no-dashboard":
         // Accepted for deploy-script compatibility; build never starts a dashboard.
@@ -769,7 +770,6 @@ function parseBuildArgs(rest: string[]): ParsedArgs {
     llmProvider,
     llmProfile,
     embeddingProvider,
-    llmModelCandidates,
     llmRequired,
     llmRetry: {
       maxAttempts: retryMaxAttempts,
@@ -777,8 +777,9 @@ function parseBuildArgs(rest: string[]): ParsedArgs {
       maxBackoffMs: null,
     },
     batchMode,
-    mapperBatchCount,
-    mapperConcurrency,
+    mappers,
+    llmConcurrencyPerMapper,
+    llmQpmLimit,
   };
 }
 

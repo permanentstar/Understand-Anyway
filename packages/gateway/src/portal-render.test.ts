@@ -5,6 +5,11 @@ function baseView(overrides: Partial<PortalView> = {}): PortalView {
   return { projects: [], ...overrides };
 }
 
+function cssRule(html: string, selector: string): string {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return html.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? "";
+}
+
 describe("renderPortalPage", () => {
   it("renders an empty-state card when there are no projects", () => {
     const html = renderPortalPage(baseView());
@@ -55,14 +60,19 @@ describe("renderPortalPage", () => {
     expect(withoutAssets).toContain("footer-wordmark-text");
   });
 
-  it("paints pageBackground on the body (cover) and omits it when absent", () => {
+  it("paints pageBackground on the scrollable stage instead of a fixed body background", () => {
     const withPageBg = renderPortalPage(baseView({
       assets: { pageBackground: "/portal-assets/portal-background.png" },
     }));
     expect(withPageBg).toContain(
-      'url("/portal-assets/portal-background.png") center / cover no-repeat fixed',
+      '.stage { background: url("/portal-assets/portal-background.png") top center / 100% auto no-repeat; }',
     );
-    expect(withPageBg).toContain("body {");
+    expect(withPageBg).toContain(".page-background-layout .hero-stage { padding: 0 0 8px; }");
+    expect(withPageBg).toContain(".page-background-layout .stage { width: 100vw; max-width: none; }");
+    expect(withPageBg).toContain(".page-background-layout .project-deck { top: 65%; }");
+    expect(withPageBg).toContain(".page-background-layout .overflow-section { margin-top: -120px; }");
+    expect(withPageBg).not.toContain(".portal-scroll.page-background-layout { background:");
+    expect(withPageBg).not.toContain("no-repeat fixed");
 
     const withoutPageBg = renderPortalPage(baseView());
     expect(withoutPageBg).not.toContain("portal-background.png");
@@ -82,7 +92,53 @@ describe("renderPortalPage", () => {
     expect(html).toContain("portal-scroll has-overflow page-background-layout");
     expect(html).toContain("project-deck project-deck-count-5 page-background-deck");
     expect(html).toContain("overflow-section page-background-overflow-section");
-    expect(html).toContain(".portal-scroll.page-background-layout.no-overflow .hero-stage");
+    expect(html).toContain(".extra-projects { margin-top: 20px; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 12px; }");
+  });
+
+  it("allows page-background overflow pages to scroll with the background art", () => {
+    const projects = Array.from({ length: 6 }, (_, i) => ({
+      id: `p${i}`,
+      name: `Project ${i}`,
+      href: `/project/p${i}/`,
+    }));
+    const html = renderPortalPage(baseView({
+      projects,
+      assets: { pageBackground: "/portal-assets/portal-background.png" },
+    }));
+
+    expect(html).toContain("portal-scroll has-overflow page-background-layout");
+    expect(html).not.toContain(".portal-scroll.page-background-layout.has-overflow { overflow-y: hidden; }");
+    expect(html).not.toContain("background-attachment: local");
+  });
+
+  it("keeps page-background overflow projects in the deploy-style wide grid area", () => {
+    const projects = Array.from({ length: 12 }, (_, i) => ({
+      id: `p${i}`,
+      name: `Project ${i}`,
+      href: `/project/p${i}/`,
+    }));
+    const html = renderPortalPage(baseView({
+      projects,
+      assets: { pageBackground: "/portal-assets/portal-background.png" },
+    }));
+
+    const overflowRule = cssRule(html, ".page-background-layout.has-overflow .page-background-overflow-section");
+    expect(overflowRule).toBe("");
+
+    const projectsRule = cssRule(html, ".page-background-layout.has-overflow .extra-projects");
+    expect(projectsRule).toBe("");
+
+    const genericOverflowRule = cssRule(html, ".overflow-section");
+    expect(genericOverflowRule).toContain("width: min(1480px, calc(100vw - 32px))");
+    expect(genericOverflowRule).toContain("position: relative");
+    expect(genericOverflowRule).not.toContain("position: absolute");
+
+    const extraProjectsRule = cssRule(html, ".extra-projects");
+    expect(extraProjectsRule).toContain("display: grid");
+    expect(extraProjectsRule).toContain("grid-template-columns: repeat(8, minmax(0, 1fr))");
+
+    const footerRule = cssRule(html, ".portal-footer");
+    expect(footerRule).toContain("margin-top: auto");
   });
 
   it("renders up to two footer links with provided hrefs", () => {

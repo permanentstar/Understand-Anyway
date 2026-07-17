@@ -53,20 +53,13 @@ record:
   config:
     feishu-sheets:
       spreadsheetToken: "{{ RECORD_SHEET_TOKEN }}"
-      mappings:
-        user-event:
-          worksheet: "user-event"
-          columns: ["eventId", "eventTime", "eventType", "sessionId", "userName",
-                    "userEnName", "openId", "email", "authReason", "departmentPaths",
-                    "sourceIp", "userAgent", "targetType", "targetId", "targetName",
-                    "targetUrl", "extra"]
-        nightly-update:
-          worksheet: "nightly-update"
-          columns: ["runId", "startedAt", "finishedAt", "overallStatus", "projectCount",
-                    "successCount", "failedCount", "buildSuccessCount", "recordProvider",
-                    "recordStatus", "resultJson"]
-        # project-update 的完整 41 列老 deploy 超集见 packages/cli/deploy.example.yaml；
-        # 不要为了手写方便缩短 header。
+      # 三张标准表的 header 内置在 provider-feishu-sheets：
+      # user-event / nightly-update / project-update
+      # 不配置 worksheets 时，worksheet 名默认就是上述三个 key。
+      # worksheets:
+      #   user-event: "user-event"
+      #   nightly-update: "nightly-update"
+      #   project-update: "project-update"
 
 deployProfiles:
   ppe:
@@ -75,15 +68,19 @@ deployProfiles:
       excludeTests: true
       llmAnalysis: true
       llmRequired: false
-      llmModelCandidates: ["small"]
+      mappers: 1
+      llmConcurrencyPerMapper: 1
+      llmQpmLimit: 2
       llmRetry: { maxAttempts: 2, initialBackoffMs: 300, maxBackoffMs: 10000 }
   prod:
     build:
       mode: "incremental"
       excludeTests: true
       llmAnalysis: true
-      llmRequired: false
-      llmModelCandidates: ["large"]
+      llmRequired: true
+      mappers: 4
+      llmConcurrencyPerMapper: 4
+      llmQpmLimit: 30
       llmRetry: { maxAttempts: 3, initialBackoffMs: 500, maxBackoffMs: 30000 }
 
 profiles:
@@ -211,6 +208,21 @@ understand-anyway repair llm-failures       --project <id>
 understand-anyway repair llm-graph-failures --project <id>
 ```
 
+### 1.10.1 大项目 LLM 中断后续跑
+
+`--resume` 会复用已有 `scan-result.json / batches.json / batch-*.json`，
+只补缺失 batch，并重新读取当前 deploy profile 的并发参数：
+
+```bash
+understand-anyway build \
+  --project <id> \
+  --resume \
+  --deploy-profile prod \
+  --llm-profile traex \
+  --exclude-tests \
+  --no-dashboard
+```
+
 ### 1.11 标准 OSS 安装形态（无源码树）
 
 只从 registry 安装 CLI、不 clone 源码时，用 `understand-anyway ops <name>` 调用包内
@@ -311,7 +323,7 @@ understand-anyway serve --project <id>   # 前台 serve，不走 daemon
 | CLI 参数 | YAML 字段 | 备注 |
 |----------|-----------|------|
 | `--host` / `--port` | `deploy.host` / `deploy.port` | CLI 临时覆盖 |
-| `--deploy-profile <p>` | `deployProfiles.<p>.build` | ppe=small，prod=large |
+| `--deploy-profile <p>` | `deployProfiles.<p>.build` | 选择构建模式、可靠性和并发预算 |
 | `--llm-profile <n>` | `llmProfiles.<n>` | 选择 traex / traecli 等 LLM provider |
 | `UA_DEPLOY_PROFILE` | `~/.env UA_DEPLOY_PROFILE` | env 必配，CLI 可用 `--deploy-profile` 临时覆盖 |
 | `--plugin-root` | `~/.env UA_PLUGIN_ROOT` | env 兜底，CLI 临时覆盖 |
@@ -322,7 +334,7 @@ understand-anyway serve --project <id>   # 前台 serve，不走 daemon
 - `providers.{auth,orgPolicy,portalAssets,embedding}.{package,config}`
 - `llmProfiles.<n>.{package,config}`
 - `record.providers / record.config.<provider>.*`
-- `deployProfiles.<n>.build.{mode,excludeTests,outputLanguage,llmAnalysis,llmRequired,llmModelCandidates,llmRetry.*}`
+- `deployProfiles.<n>.build.{mode,excludeTests,outputLanguage,llmAnalysis,llmRequired,mappers,llmConcurrencyPerMapper,llmQpmLimit,llmRetry.*}`
 - `profiles.<n>.{portal,projectRoute,registry,use}`
 
 ---

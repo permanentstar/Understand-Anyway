@@ -372,7 +372,64 @@ describe("runLlmFileAnalysis", () => {
     expect(result.stats.tasks).toBe(1);
   });
 
-  it("throws in required mode when a batch response omits an input file", async () => {
+  it("accepts a strict batch JSON object followed by extra provider output", async () => {
+    const response = [
+      JSON.stringify({
+        results: [
+          { filePath: "src/a.ts", response: { fileSummary: "A", tags: ["a"], complexity: "simple", functionSummaries: {}, classSummaries: {} } },
+          { filePath: "src/b.ts", response: { fileSummary: "B", tags: ["b"], complexity: "moderate", functionSummaries: {}, classSummaries: {} } },
+        ],
+      }),
+      JSON.stringify({ debug: "trailing object from provider wrapper" }),
+    ].join("\n");
+
+    const result = await runLlmFileAnalysis({
+      enabled: true,
+      required: true,
+      files: [{ path: "src/a.ts" }, { path: "src/b.ts" }],
+      analysisRoot: "/repo",
+      projectContext: "repo",
+      readFile: () => "source",
+      provider: { name: "fake", complete: async () => ({ text: response }) },
+      core: fakeCore,
+      retryPolicy: noRetryPolicy,
+      retryDeps: noopRetryDeps,
+    });
+
+    expect(result.analyses.get("src/a.ts")?.fileSummary).toBe("A");
+    expect(result.analyses.get("src/b.ts")?.fileSummary).toBe("B");
+    expect(result.stats).toMatchObject({ requested: 2, analyzed: 2, failed: 0 });
+  });
+
+  it("recovers complete batch result entries when a fenced results array omits commas", async () => {
+    const response = [
+      "```json",
+      "{\"results\":[",
+      "{\"filePath\":\"src/a.ts\",\"response\":{\"fileSummary\":\"A\",\"tags\":[\"a\"],\"complexity\":\"simple\",\"functionSummaries\":{},\"classSummaries\":{}}}",
+      "{\"filePath\":\"src/b.ts\",\"response\":{\"fileSummary\":\"B\",\"tags\":[\"b\"],\"complexity\":\"moderate\",\"functionSummaries\":{},\"classSummaries\":{}}}",
+      "]}",
+      "```",
+    ].join("\n");
+
+    const result = await runLlmFileAnalysis({
+      enabled: true,
+      required: true,
+      files: [{ path: "src/a.ts" }, { path: "src/b.ts" }],
+      analysisRoot: "/repo",
+      projectContext: "repo",
+      readFile: () => "source",
+      provider: { name: "fake", complete: async () => ({ text: response }) },
+      core: fakeCore,
+      retryPolicy: noRetryPolicy,
+      retryDeps: noopRetryDeps,
+    });
+
+    expect(result.analyses.get("src/a.ts")?.fileSummary).toBe("A");
+    expect(result.analyses.get("src/b.ts")?.fileSummary).toBe("B");
+    expect(result.stats).toMatchObject({ requested: 2, analyzed: 2, failed: 0 });
+  });
+
+  it("throws in required mode when batch missing fallback also fails", async () => {
     await expect(runLlmFileAnalysis({
       enabled: true,
       required: true,
@@ -393,7 +450,48 @@ describe("runLlmFileAnalysis", () => {
       core: fakeCore,
       retryPolicy: noRetryPolicy,
       retryDeps: noopRetryDeps,
-    })).rejects.toThrow(/LLM batch response missing file result: src\/b\.ts/);
+    })).rejects.toThrow(/LLM fallback file analysis failed: src\/b\.ts: LLM parse failed for src\/b\.ts/);
+  });
+
+  it("falls back to single-file analysis when a batch response omits a file", async () => {
+    const prompts: string[] = [];
+    const result = await runLlmFileAnalysis({
+      enabled: true,
+      required: true,
+      files: [{ path: "src/a.ts" }, { path: "src/b.ts" }],
+      analysisRoot: "/repo",
+      projectContext: "repo",
+      readFile: () => "source",
+      provider: {
+        name: "fake",
+        complete: async (request) => {
+          prompts.push(request.prompt);
+          if (request.prompt.includes("Analyze each source file independently")) {
+            return {
+              text: JSON.stringify({
+                results: [
+                  { filePath: "src/a.ts", response: { fileSummary: "A", tags: ["a"], complexity: "simple", functionSummaries: {}, classSummaries: {} } },
+                ],
+              }),
+            };
+          }
+          return { text: "ok" };
+        },
+      },
+      core: fakeCore,
+      retryPolicy: noRetryPolicy,
+      retryDeps: noopRetryDeps,
+    });
+
+    expect(prompts).toHaveLength(2);
+    expect(result.analyses.get("src/a.ts")?.fileSummary).toBe("A");
+    expect(result.analyses.get("src/b.ts")?.fileSummary).toBe("LLM summary");
+    expect(result.stats).toMatchObject({ requested: 2, analyzed: 2, failed: 0 });
+    expect(result.artifacts?.attemptJournal.at(-1)).toMatchObject({
+      operation: "file-analysis-batch",
+      status: "partial",
+      reason: "LLM batch response missing file result: src/b.ts",
+    });
   });
 
   it("trips breaker after consecutive retryable task failures and skips the rest", async () => {

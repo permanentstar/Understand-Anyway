@@ -31,12 +31,18 @@ describe("buildUserEventPayload", () => {
     expect(typeof env.payload.eventId).toBe("string");
   });
 
-  it("degrades gracefully without a session", () => {
-    const env = buildUserEventPayload(null, fakeReq(), { eventType: "authz_denied" });
-    expect(env.payload.userId).toBe("");
+  it("records anonymous identity without a session", () => {
+    const env = buildUserEventPayload(null, fakeReq({}, "203.0.113.9"), { eventType: "authz_denied" });
+    expect(env.payload.userId).toBe("anonymous:203.0.113.9");
     expect(env.payload.email).toBe("");
-    expect(env.payload.displayName).toBe("");
+    expect(env.payload.displayName).toBe("anonymous@203.0.113.9");
     expect(env.payload.raw).toEqual({});
+  });
+
+  it("uses local timezone ISO timestamps instead of UTC Z timestamps", () => {
+    const env = buildUserEventPayload(null, fakeReq(), { eventType: "project_view" });
+    expect(env.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?[+-]\d{2}:\d{2}$/);
+    expect(env.payload.eventTime).toBe(env.timestamp);
   });
 
   it("passes provider-specific identity through raw opaquely", () => {

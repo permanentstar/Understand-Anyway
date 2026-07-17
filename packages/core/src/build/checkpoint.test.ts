@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { BuildPaths } from "./artifacts.js";
-import { validatePhase2Checkpoint } from "./checkpoint.js";
+import { validatePhase2Checkpoint, validatePhase2ResumeCheckpoint } from "./checkpoint.js";
 
 const paths: BuildPaths = {
   stateRoot: "/repo",
@@ -49,6 +49,42 @@ describe("validatePhase2Checkpoint", () => {
 
     expect(result.batchIndexes).toEqual([1]);
     expect(result.batches).toHaveLength(1);
+  });
+
+  it("accepts a partial checkpoint for resume without requiring every batch artifact", () => {
+    const scan = JSON.stringify({ files: [] });
+    const batches = JSON.stringify({ batches: [{ batchIndex: 1 }, { batchIndex: 2 }] });
+    const files: Record<string, string> = {
+      [paths.scanPath]: scan,
+      [paths.batchesPath]: batches,
+      [paths.phase2ManifestPath]: JSON.stringify({
+        version: 1,
+        buildKind: "full",
+        sourceGitCommit: "abc",
+        sourceDirty: false,
+        outputLanguage: "en",
+        excludeTests: true,
+        scanResultSha256: sha256(scan),
+        batchesSha256: sha256(batches),
+        batchCount: 2,
+        createdAt: "2026-06-18T00:00:00",
+      }),
+      "/repo/.understand-anything/intermediate/batch-1.json": JSON.stringify({ nodes: [], edges: [] }),
+    };
+
+    const result = validatePhase2ResumeCheckpoint(paths, {
+      existsSync: (p) => p in files,
+      readFileSync: (p) => files[p]!,
+    });
+
+    expect(result.batchIndexes).toEqual([1, 2]);
+    expect(result.batches).toHaveLength(2);
+    expect(() =>
+      validatePhase2Checkpoint(paths, {
+        existsSync: (p) => p in files,
+        readFileSync: (p) => files[p]!,
+      }),
+    ).toThrow(/batch artifact missing/);
   });
 
   it("throws on missing manifest", () => {
