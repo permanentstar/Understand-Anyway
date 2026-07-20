@@ -13,7 +13,7 @@ export const EXTERNAL_CASE_ENV_VARS = {
 };
 
 export const LOCAL_REQUIRED_CHECKS = [
-  { name: "static:typecheck_build_test", command: "pnpm", args: ["-r", "typecheck"], next: { command: "pnpm", args: ["-r", "build"] }, next2: { command: "pnpm", args: ["-r", "test"] }, required: true },
+  { name: "static:typecheck_build_test", command: "pnpm", args: ["-r", "build"], next: { command: "pnpm", args: ["-r", "typecheck"] }, next2: { command: "pnpm", args: ["-r", "test"] }, required: true },
   { name: "static:test_scripts", command: "pnpm", args: ["test:scripts"], required: true },
   { name: "static:lint_isolation", command: "pnpm", args: ["lint:isolation"], required: true },
   { name: "static:lint_isolation_test", command: "pnpm", args: ["lint:isolation:test"], required: true },

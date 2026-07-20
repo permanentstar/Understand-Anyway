@@ -36,14 +36,14 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Build
+        run: pnpm -r build
+
       - name: Typecheck
         run: pnpm -r typecheck
 
       - name: Test
         run: pnpm -r test
-
-      - name: Build
-        run: pnpm -r build
 
       - name: D-line isolation guard
         run: pnpm lint:isolation

@@ -61,4 +61,24 @@ assert.equal(plan.external[0].required, false);
 const gitignore = readFileSync(resolve(REPO_ROOT, ".gitignore"), "utf8");
 assert.match(gitignore, /^\.release-gate\/$/m);
 
+const staticCheck = LOCAL_REQUIRED_CHECKS.find((check) => check.name === "static:typecheck_build_test");
+assert.deepEqual(
+  [
+    [staticCheck.command, ...staticCheck.args].join(" "),
+    [staticCheck.next.command, ...staticCheck.next.args].join(" "),
+    [staticCheck.next2.command, ...staticCheck.next2.args].join(" "),
+  ],
+  ["pnpm -r build", "pnpm -r typecheck", "pnpm -r test"],
+);
+
+const ciWorkflow = readFileSync(resolve(REPO_ROOT, ".github", "workflows", "ci.yml"), "utf8");
+const buildStepIndex = ciWorkflow.indexOf("name: Build");
+const typecheckStepIndex = ciWorkflow.indexOf("name: Typecheck");
+const testStepIndex = ciWorkflow.indexOf("name: Test");
+assert.ok(buildStepIndex >= 0, "CI workflow should contain a Build step");
+assert.ok(typecheckStepIndex >= 0, "CI workflow should contain a Typecheck step");
+assert.ok(testStepIndex >= 0, "CI workflow should contain a Test step");
+assert.ok(buildStepIndex < typecheckStepIndex, "CI Build step should run before Typecheck");
+assert.ok(typecheckStepIndex < testStepIndex, "CI Typecheck step should run before Test");
+
 console.log("release-gate.test.mjs: all checks passed");
