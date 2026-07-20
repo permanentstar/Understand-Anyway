@@ -43,10 +43,24 @@ Understand-Anything 很擅长“理解一个项目”。真正落到部署场景
 环境要求：
 
 - Node.js **>= 20**
-- pnpm **>= 9**
 - 本地已安装上游
   [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything)
   plugin
+- 只有从源码 checkout 运行时才需要 pnpm **>= 9**
+
+从 npm 安装 CLI：
+
+```bash
+mkdir understand-anyway-ops
+cd understand-anyway-ops
+npm init -y
+npm install @understand-anyway/cli
+
+export UA_PLUGIN_ROOT="$HOME/.understand-anything/repo/understand-anything-plugin"
+npx understand-anyway --help
+```
+
+开发或发版验证时，也可以从源码 checkout 运行：
 
 ```bash
 git clone https://github.com/permanentstar/Understand-Anyway.git
@@ -66,7 +80,7 @@ node packages/cli/dist/cli.js --help
 ## 文档地图
 
 - [部署架构](docs/deployment.md)：运行态模型、配置分层、命令族设计与 gateway 版本化。
-- [Deployment CLI 手册](docs/deployment-cli.md)：`deploy.yaml` 模板和高频运维场景。
+- [Deployment CLI 手册](docs/deployment-cli.md)：`deploy.yaml` 模板、高频运维场景和 npm 安装态用法。
 - [发版测试矩阵](docs/release-tests/README.md)：local / external release gate 覆盖面与入口。
 - [本地发布验证](docs/local-release-verification.md)：本地 registry 演练与 clean-install 验证。
 - [Plugin API](packages/plugin-api/README.md)：provider SPI 与运行时工厂约定。

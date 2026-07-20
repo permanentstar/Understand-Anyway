@@ -55,10 +55,24 @@ gateway, and release flow that teams can actually run.
 Requirements:
 
 - Node.js **>= 20**
-- pnpm **>= 9**
 - The upstream
   [Understand-Anything](https://github.com/Egonex-AI/Understand-Anything)
   plugin installed somewhere on disk
+- pnpm **>= 9** only if you run from a source checkout
+
+Install the CLI from npm:
+
+```bash
+mkdir understand-anyway-ops
+cd understand-anyway-ops
+npm init -y
+npm install @understand-anyway/cli
+
+export UA_PLUGIN_ROOT="$HOME/.understand-anything/repo/understand-anything-plugin"
+npx understand-anyway --help
+```
+
+Or run from a source checkout when developing or validating a release:
 
 ```bash
 git clone https://github.com/permanentstar/Understand-Anyway.git
@@ -80,7 +94,7 @@ run `pnpm run delivery:local`.
 - [Deployment architecture](docs/deployment.md) — runtime model, config
   layering, command families, and gateway versioning.
 - [Deployment CLI manual](docs/deployment-cli.md) — `deploy.yaml` template and
-  common operator scenarios.
+  common operator scenarios, including npm-installed CLI usage.
 - [Release test matrix](docs/release-tests/README.md) — local / external
   release-gate coverage and entry points.
 - [Local release verification](docs/local-release-verification.md) — local

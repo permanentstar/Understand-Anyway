@@ -229,15 +229,20 @@ understand-anyway build \
 `dist-scripts/` 里的编排脚本，等价于源码形态下的 `scripts/<name>.sh`：
 
 ```bash
+mkdir understand-anyway-ops
+cd understand-anyway-ops
+npm init -y
 npm install @understand-anyway/cli          # 或 pnpm add / yarn add
-understand-anyway ops daily-update          --project <id> --deploy-profile ppe --llm-profile traex
-understand-anyway ops nightly-project-sync  --project <id> --deploy-profile ppe --llm-profile traex
-understand-anyway ops refresh-prod-server   --deploy-profile ppe
+npx understand-anyway ops daily-update          --project <id> --deploy-profile ppe --llm-profile traex
+npx understand-anyway ops nightly-project-sync  --project <id> --deploy-profile ppe --llm-profile traex
+npx understand-anyway ops refresh-prod-server   --deploy-profile ppe
 ```
 
 - 可用脚本：`daily-update`、`nightly-project-sync`、`refresh-prod-server`。参数与
   对应 `scripts/<name>.sh` 完全一致（见 [§2 脚本参数表](#2-脚本参数表)），`ops`
   之后的所有参数原样透传。
+- 如果用 `npm install -g @understand-anyway/cli` 做全局安装，可以把上面的
+  `npx understand-anyway` 简写为 `understand-anyway`。
 - 包内脚本以 `bash <script>` 方式互相调用，不依赖文件 exec 位（npm 安装会丢 exec 位）。
 - gateway runtime release 在 npm 扁平 `node_modules` 布局下会连同依赖一起复制，
   无需源码 workspace。

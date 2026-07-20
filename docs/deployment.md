@@ -15,16 +15,29 @@
 
 ## 1. 前置要求
 
-- Node.js 20+，pnpm 9+
+- Node.js 20+
 - upstream Understand-Anything plugin 独立安装（Understand-Anyway 不捆绑）
 - 每个被分析项目是本机可读的 git checkout
+- 从源码 checkout 运行时需要 pnpm 9+
 - LLM / 鉴权 / 组织策略 / 通知 / 品牌资源走 YAML provider 包名动态加载；开源代码不内置任何私有 provider
 
-最小安装：
+标准安装形态是直接从 npm 安装 CLI：
+
+```bash
+mkdir understand-anyway-ops
+cd understand-anyway-ops
+npm init -y
+npm install @understand-anyway/cli
+npx understand-anyway --help
+```
+
+如果是在维护本仓库或做发版前验证，再从源码 checkout 运行：
 
 ```bash
 pnpm install && pnpm build
 ```
+
+无源码树的运维脚本入口见 [deployment-cli.md §1.11](./deployment-cli.md#111-标准-oss-安装形态无源码树)。
 
 ## 2. 运行态总览
 
