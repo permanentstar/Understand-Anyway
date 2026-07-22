@@ -153,6 +153,27 @@ describe("runGraphHealthReview — graph integrity", () => {
     fx.cleanup();
   });
 
+  it("flags duplicate_node_ids as critical", () => {
+    const fx = makeFixture({
+      graph: {
+        nodes: [
+          { id: "src/a.ts", type: "file", path: "src/a.ts" },
+          { id: "src/a.ts", type: "file", path: "src/a.ts" },
+        ],
+        edges: [{ type: "contains", source: "src/a.ts", target: "src/a.ts" }],
+      },
+      meta: minimalMeta,
+      config: minimalConfig,
+      modules: activeModules,
+      repoFiles: ["src/a.ts"],
+    });
+    const result = runGraphHealthReview({ repoPath: fx.repoDir, stateDir: fx.stateDir, execFileSync: fakeExec });
+    expect(result.approved).toBe(false);
+    expect(result.issues.some((issue) => issue.id === "duplicate_node_ids")).toBe(true);
+    expect(result.stats.duplicateNodeIdCount).toBe(1);
+    fx.cleanup();
+  });
+
   it("flags imports_edges_missing only when file nodes look importable", () => {
     const fx = makeFixture({
       graph: {

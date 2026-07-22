@@ -32,6 +32,19 @@ function nodeBelongsToFiles(node: GraphNode, files: Set<string>): boolean {
   return files.has(node.id);
 }
 
+function mergeNodesById<T extends GraphNode>(existingNodes: T[], updateNodes: T[]): T[] {
+  const merged = new Map<string, T>();
+  for (const node of existingNodes) {
+    if (!node?.id) continue;
+    merged.set(node.id, node);
+  }
+  for (const node of updateNodes) {
+    if (!node?.id) continue;
+    merged.set(node.id, node);
+  }
+  return [...merged.values()];
+}
+
 /**
  * Partial-graph merge ported from deploy. **Intentional fork** from upstream
  * `core.mergeGraphUpdate(graph, changedFilePaths, newNodes, newEdges, newCommitHash)`:
@@ -67,7 +80,7 @@ export function mergeGraphPartialUpdate<T extends GraphLike>(existing: T, update
 
   return {
     ...existing,
-    nodes: [...keptNodes, ...update.nodes],
+    nodes: mergeNodesById(keptNodes, update.nodes),
     edges: dedupeEdges([...keptEdges, ...updateEdges]),
   };
 }

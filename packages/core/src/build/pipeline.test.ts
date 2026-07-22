@@ -1199,6 +1199,108 @@ describe("runFullBuild (orchestration)", () => {
     expect(Object.keys(writes).some((p) => p.startsWith("/repo/.understand-anything/"))).toBe(false);
   });
 
+  it("incremental dedupes unchanged re-emitted nodes without dropping untouched inbound edges", async () => {
+    const { core, saved } = makeCore();
+    const getChangedFiles = vi.fn().mockReturnValue(["src/changed.ts"]);
+    (core as any).getChangedFiles = getChangedFiles;
+    const fs: Record<string, string> = {
+      "/state/.understand-anything/knowledge-graph.json": JSON.stringify({
+        version: GRAPH_VERSION,
+        project: { gitCommitHash: "base123" },
+        nodes: [
+          { id: "src/changed.ts", type: "file", filePath: "src/changed.ts" },
+          { id: "src/changed.ts#old", type: "function", filePath: "src/changed.ts" },
+          { id: "src/unchanged.ts", type: "file", filePath: "src/unchanged.ts" },
+          { id: "class:src/unchanged.ts:Keep", type: "class", filePath: "src/unchanged.ts" },
+          { id: "src/outside.ts", type: "file", filePath: "src/outside.ts" },
+        ],
+        edges: [
+          { type: "contains", source: "src/changed.ts", target: "src/changed.ts#old" },
+          { type: "contains", source: "src/unchanged.ts", target: "class:src/unchanged.ts:Keep" },
+          { type: "imports", source: "src/outside.ts", target: "src/unchanged.ts" },
+        ],
+      }),
+      "/state/.understand-anything/intermediate/scan-result.json": JSON.stringify({
+        files: [
+          { path: "src/changed.ts", fileCategory: "code", language: "ts" },
+          { path: "src/unchanged.ts", fileCategory: "code", language: "ts" },
+        ],
+        totalFiles: 2,
+      }),
+      "/state/.understand-anything/intermediate/batches.json": JSON.stringify({
+        batches: [
+          {
+            batchIndex: 1,
+            files: [
+              { path: "src/changed.ts", fileCategory: "code", language: "ts" },
+              { path: "src/unchanged.ts", fileCategory: "code", language: "ts" },
+            ],
+          },
+        ],
+      }),
+      "/state/.understand-anything/intermediate/phase2-input-manifest.json": JSON.stringify({
+        batchesSha256: "skip",
+        batchCount: 1,
+      }),
+      "/state/.understand-anything/intermediate/batch-1.json": JSON.stringify({
+        nodes: [
+          { id: "src/changed.ts", type: "file", filePath: "src/changed.ts" },
+          { id: "src/changed.ts#new", type: "function", filePath: "src/changed.ts" },
+          { id: "src/unchanged.ts", type: "file", filePath: "src/unchanged.ts", summary: "fresh summary" },
+          { id: "class:src/unchanged.ts:Keep", type: "class", filePath: "src/unchanged.ts", summary: "fresh class summary" },
+        ],
+        edges: [
+          { type: "contains", source: "src/changed.ts", target: "src/changed.ts#new" },
+          { type: "contains", source: "src/unchanged.ts", target: "class:src/unchanged.ts:Keep" },
+        ],
+      }),
+      "/repo/src/changed.ts": "source",
+      "/repo/src/unchanged.ts": "source",
+      "/repo/src/outside.ts": "source",
+    };
+    const writes: Record<string, string> = {};
+
+    await runBuildMode(
+      { core, skillDir: "/skill", projectRoot: "/repo", stateRoot: "/state", mode: "incremental", log: () => {} },
+      {
+        existsSync: (p: string) => p in fs || p in writes,
+        readFileSync: (p: string) => {
+          const c = writes[p] ?? fs[p];
+          if (c === undefined) throw new Error(`missing ${p}`);
+          return c;
+        },
+        writeFileSync: (p: string, d: string) => { writes[p] = d; },
+        execFileSync: vi.fn() as any,
+        resolveGitHash: () => "head456",
+        createRegistry: async () => ({
+          resolveImports: () => [],
+          analyzeFile: () => ({ functions: [], classes: [] }),
+          extractCallGraph: () => [],
+        }),
+        validateCheckpoint: () => ({
+          manifest: {} as any,
+          batches: [
+            {
+              batchIndex: 1,
+              files: [
+                { path: "src/changed.ts", fileCategory: "code", language: "ts" },
+                { path: "src/unchanged.ts", fileCategory: "code", language: "ts" },
+              ],
+            },
+          ],
+          batchIndexes: [1],
+        }),
+      } as any,
+    );
+
+    const ids = saved.graph.g.nodes.map((node: any) => node.id);
+    expect(ids.filter((id: string) => id === "src/unchanged.ts")).toHaveLength(1);
+    expect(ids.filter((id: string) => id === "class:src/unchanged.ts:Keep")).toHaveLength(1);
+    expect(saved.graph.g.edges).toEqual(expect.arrayContaining([
+      { type: "imports", source: "src/outside.ts", target: "src/unchanged.ts" },
+    ]));
+  });
+
   it("incremental re-analyzes changed files from scanRoot, not the state tree", async () => {
     const { core } = makeCore();
     const getChangedFiles = vi.fn().mockReturnValue(["src/a.ts"]);

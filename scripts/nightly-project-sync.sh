@@ -370,8 +370,7 @@ NODE
     publish_vid="$(date +%Y%m%d%H%M%S)"
     publish_cmd=(understand_anyway project-state publish "$publish_vid"
       --project "$project_id"
-      --source-root "$repo_path"
-      --stable)
+      --source-root "$repo_path")
     if run_or_print "${publish_cmd[@]}" >>"$publish_log" 2>&1; then
       publish_status="success"
     else

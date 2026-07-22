@@ -242,6 +242,15 @@ export function runGraphHealthReview({
   const edges = Array.isArray(graph.edges) ? graph.edges.filter(isObject) : [];
   const edgeTypes = countBy(edges, (edge) => String(edge.type || edge.kind || edge.relationship || ""));
   const nodeTypes = countBy(nodes, (node) => String(node.type || node.kind || ""));
+  const nodeIdCounts: Record<string, number> = {};
+  for (const node of nodes) {
+    const id = String(node.id || "");
+    if (!id) continue;
+    nodeIdCounts[id] = (nodeIdCounts[id] || 0) + 1;
+  }
+  const duplicateNodeIds = Object.entries(nodeIdCounts)
+    .filter(([, count]) => count > 1)
+    .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]));
   const containsEdges = edgeTypes.contains || 0;
   const importsEdges = edgeTypes.imports || edgeTypes.import || 0;
   const callsEdges = edgeTypes.calls || edgeTypes.call || 0;
@@ -254,6 +263,17 @@ export function runGraphHealthReview({
   }
   if (containsEdges === 0) {
     issues.push({ id: "contains_edges_missing", severity: "critical", message: "knowledge graph has no contains edges" });
+  }
+  if (duplicateNodeIds.length > 0) {
+    issues.push({
+      id: "duplicate_node_ids",
+      severity: "critical",
+      message: "knowledge graph contains duplicate node ids",
+      detail: {
+        duplicateNodeIdCount: duplicateNodeIds.length,
+        samples: duplicateNodeIds.slice(0, 20).map(([id, count]) => ({ id, count })),
+      },
+    });
   }
 
   const sourceExtensions = new Set([".js", ".jsx", ".ts", ".tsx", ".java", ".scala", ".py", ".go", ".rs", ".cpp", ".cc", ".c", ".h", ".hpp"]);
@@ -343,6 +363,7 @@ export function runGraphHealthReview({
     containsEdges,
     importsEdges,
     callsEdges,
+    duplicateNodeIdCount: duplicateNodeIds.length,
     fileNodeCount: fileNodes.length,
     missingFileCount,
     metaGitHash,

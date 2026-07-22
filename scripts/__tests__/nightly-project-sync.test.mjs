@@ -480,6 +480,11 @@ function runScript(args, env) {
     check("build-dist-seq: dashboard build-dist invoked", buildDistIdx !== -1, lines.join("\n"));
     check("build-dist-seq: project-state publish invoked", publishIdx !== -1, lines.join("\n"));
     check(
+      "build-dist-seq: nightly publish does not auto-set stable",
+      (lines[publishIdx] ?? "").includes("--stable") === false,
+      lines.join("\n"),
+    );
+    check(
       "build-dist-seq: build → dashboard build-dist → project-state publish order",
       buildIdx < buildDistIdx && buildDistIdx < publishIdx,
       `build=${buildIdx} build-dist=${buildDistIdx} publish=${publishIdx}\n${lines.join("\n")}`,
